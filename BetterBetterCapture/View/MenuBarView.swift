@@ -139,12 +139,8 @@ struct MenuBarView: View {
             // Live audio level meter — kept outside the disabled group so it updates during recording
             if viewModel.settings.captureSystemAudio || viewModel.settings.captureMicrophone {
                 AudioLevelMeterView(
-                    outputDeviceName: viewModel.systemAudioDeviceName,
-                    inputDeviceName: viewModel.microphoneDeviceName,
                     outputLevel: viewModel.audioLevelMonitor.systemAudioLevel,
                     inputLevel: viewModel.audioLevelMonitor.microphoneLevel,
-                    outputVolume: viewModel.systemAudioVolume,
-                    inputVolume: viewModel.microphoneVolume,
                     showOutput: viewModel.settings.captureSystemAudio,
                     showInput: viewModel.settings.captureMicrophone
                 )
@@ -511,15 +507,18 @@ struct RecordingModeSelector: View {
 // MARK: - Audio Level Meter
 
 /// A small panel showing active audio device names, system volumes, and live level bars.
+/// Refreshes device names and volumes on a timer so system volume key changes are reflected.
 struct AudioLevelMeterView: View {
-    let outputDeviceName: String
-    let inputDeviceName: String
     let outputLevel: CGFloat
     let inputLevel: CGFloat
-    let outputVolume: Float?
-    let inputVolume: Float?
     let showOutput: Bool
     let showInput: Bool
+
+    @State private var outputDeviceName = AudioLevelMonitor.defaultOutputDeviceName()
+    @State private var inputDeviceName = AudioLevelMonitor.defaultInputDeviceName()
+    @State private var outputVolume: Float?
+    @State private var inputVolume: Float?
+    @State private var refreshTimer: Timer?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -540,6 +539,23 @@ struct AudioLevelMeterView: View {
                 )
             }
         }
+        .onAppear {
+            refreshAudioInfo()
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+                refreshAudioInfo()
+            }
+        }
+        .onDisappear {
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+        }
+    }
+
+    private func refreshAudioInfo() {
+        outputDeviceName = AudioLevelMonitor.defaultOutputDeviceName()
+        inputDeviceName = AudioLevelMonitor.defaultInputDeviceName()
+        outputVolume = AudioLevelMonitor.defaultOutputVolume()
+        inputVolume = AudioLevelMonitor.defaultInputVolume()
     }
 }
 
