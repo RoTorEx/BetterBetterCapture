@@ -30,15 +30,19 @@ struct MenuBarView: View {
                 MenuBarDivider()
             }
 
-            // Recording button (stop + timer) or Start button
+            // Recording button (stop) or Start button
             if isRecording {
-                RecordingButton(
-                    duration: viewModel.formattedDuration
+                MenuBarActionButton(
+                    title: "Stop Recording",
+                    systemImage: "stop.circle",
+                    accentColor: .red,
+                    isProminent: true
                 ) {
                     Task {
                         await viewModel.stopRecording()
                     }
                 }
+                .padding(.horizontal, 12)
                 .padding(.top, 8)
             } else {
                 MenuBarActionButton(
@@ -241,53 +245,6 @@ struct MenuBarActionButton: View {
             return isHovered ? accentColor.opacity(0.85) : accentColor
         }
         return isHovered ? accentColor.opacity(0.1) : .clear
-    }
-}
-
-// MARK: - Recording Button
-
-/// A combined button that shows recording status and allows stopping
-struct RecordingButton: View {
-    let duration: String
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                // Pulsing red dot with stop icon
-                ZStack {
-                    Circle()
-                        .fill(.gray.opacity(0.2))
-                        .frame(width: 24, height: 24)
-
-                    Image(systemName: "stop.circle")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.red.opacity(0.8))
-                }
-
-                Text("Stop Recording")
-                    .font(.system(size: 13, weight: .semibold))
-
-                Spacer()
-
-                Text(duration)
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(isHovered ? .red.opacity(0.1) : .clear)
-                .padding(.horizontal, 4)
-        )
-        .onHover { hovering in
-            isHovered = hovering
-        }
     }
 }
 

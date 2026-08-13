@@ -142,6 +142,25 @@ enum AudioCodec: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Audio bitrate options for AAC recordings
+enum AudioBitrate: Int, CaseIterable, Identifiable {
+    case low = 64000
+    case standard = 128000
+    case high = 192000
+    case max = 256000
+
+    var id: Int { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .low: "64 kbps"
+        case .standard: "128 kbps"
+        case .high: "192 kbps"
+        case .max: "256 kbps"
+        }
+    }
+}
+
 /// Frame rate options for recording
 enum FrameRate: Int, CaseIterable, Identifiable {
     case native = 0
@@ -461,6 +480,15 @@ final class SettingsStore {
         }
     }
 
+    var audioBitrate: AudioBitrate {
+        get {
+            AudioBitrate(rawValue: audioBitrateRaw) ?? .standard
+        }
+        set {
+            audioBitrateRaw = newValue.rawValue
+        }
+    }
+
     var selectedMicrophoneID: String? {
         get {
             access(keyPath: \.selectedMicrophoneID)
@@ -739,6 +767,18 @@ final class SettingsStore {
         set {
             withMutation(keyPath: \.audioCodecRaw) {
                 defaults.set(newValue, forKey: "audioCodec")
+            }
+        }
+    }
+
+    private var audioBitrateRaw: Int {
+        get {
+            access(keyPath: \.audioBitrateRaw)
+            return defaults.object(forKey: "audioBitrate") as? Int ?? AudioBitrate.standard.rawValue
+        }
+        set {
+            withMutation(keyPath: \.audioBitrateRaw) {
+                defaults.set(newValue, forKey: "audioBitrate")
             }
         }
     }

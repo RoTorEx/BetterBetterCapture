@@ -540,7 +540,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: 48000,
                 AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: 128000
+                AVEncoderBitRateKey: settings.audioBitrate.rawValue
             ]
 
         case .pcm:

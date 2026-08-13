@@ -533,6 +533,17 @@ struct AudioSettingsSection: View {
                     )
                 }
             )
+
+            // Audio Bitrate Picker (only for AAC)
+            if settings.audioCodec == .aac {
+                MenuBarExpandablePicker(
+                    name: "Audio Bitrate",
+                    selection: $settings.audioBitrate,
+                    optionsWithState: AudioBitrate.allCases.map { bitrate in
+                        PickerOption(value: bitrate, label: bitrate.displayName)
+                    }
+                )
+            }
         }
     }
 }

@@ -195,6 +195,15 @@ struct AudioSettingsView: View {
                     }
                 }
                 .help("AAC is compressed, PCM is uncompressed lossless (MOV only)")
+
+                if settings.audioCodec == .aac {
+                    Picker("Bitrate", selection: $settings.audioBitrate) {
+                        ForEach(AudioBitrate.allCases) { bitrate in
+                            Text(bitrate.displayName).tag(bitrate)
+                        }
+                    }
+                    .help("Higher bitrate = better quality and larger files")
+                }
             }
 
             Section {
