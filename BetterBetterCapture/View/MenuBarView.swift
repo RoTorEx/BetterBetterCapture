@@ -36,7 +36,8 @@ struct MenuBarView: View {
                     title: "Stop Recording",
                     systemImage: "stop.circle",
                     accentColor: .red,
-                    isProminent: true
+                    isProminent: true,
+                    trailingLabel: viewModel.formattedDuration
                 ) {
                     Task {
                         await viewModel.stopRecording()
@@ -196,6 +197,7 @@ struct MenuBarActionButton: View {
     var accentColor: Color = .primary
     var isDisabled: Bool = false
     var isProminent: Bool = false
+    var trailingLabel: String?
     let action: () -> Void
     @State private var isHovered = false
 
@@ -217,6 +219,11 @@ struct MenuBarActionButton: View {
                     .font(.system(size: 13, weight: isProminent ? .semibold : .medium))
                     .foregroundStyle(isDisabled ? Color.gray.opacity(0.5) : (isProminent ? .white : Color.primary))
                 Spacer()
+                if let trailingLabel {
+                    Text(trailingLabel)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(isProminent ? .white.opacity(0.9) : .secondary)
+                }
             }
             .padding(.horizontal, isProminent ? 10 : 12)
             .padding(.vertical, isProminent ? 6 : 4)

@@ -102,12 +102,19 @@ struct BetterBetterCaptureApp: App {
 }
 
 /// The label shown in the menu bar. Uses a static film icon when idle and a
-/// red recording indicator icon while recording so the status item never changes width.
+/// red camera or microphone icon while recording, depending on the recording mode.
 struct MenuBarLabel: View {
     let viewModel: RecorderViewModel
 
     var body: some View {
-        Image(systemName: viewModel.isRecording ? "record.circle.fill" : "film")
+        Image(systemName: menuBarIconName)
             .foregroundStyle(viewModel.isRecording ? .red : .primary)
+    }
+
+    private var menuBarIconName: String {
+        if viewModel.isRecording {
+            return viewModel.settings.recordAudioOnly ? "mic.circle.fill" : "video.circle.fill"
+        }
+        return "film"
     }
 }
