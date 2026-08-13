@@ -644,45 +644,119 @@ final class AudioLevelMonitor {
 
         guard frameCount > 0, channelCount > 0 else { return 0 }
 
-        let totalSamples = frameCount * channelCount
-        var sum: Double = 0
-
         let isFloat = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsFloat != 0
         let isBigEndian = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsBigEndian != 0
+        let isNonInterleaved = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsNonInterleaved != 0
         let bytesPerSample = Int(asbd.pointee.mBitsPerChannel) / 8
 
+        var sum: Double = 0
+        var sampleCount = 0
+
         if isFloat && bytesPerSample == MemoryLayout<Float>.size {
-            dataPointer.withMemoryRebound(to: Float.self, capacity: totalSamples) { samples in
-                for index in 0..<totalSamples {
-                    let sample = Double(samples[index])
-                    sum += sample * sample
-                }
+            dataPointer.withMemoryRebound(to: Float.self, capacity: frameCount * channelCount) { samples in
+                let (count, channelSum) = processFloatSamples(
+                    samples: samples,
+                    frameCount: frameCount,
+                    channelCount: channelCount,
+                    isNonInterleaved: isNonInterleaved
+                )
+                sampleCount = count
+                sum = channelSum
             }
         } else if !isFloat && bytesPerSample == MemoryLayout<Int16>.size {
-            dataPointer.withMemoryRebound(to: Int16.self, capacity: totalSamples) { samples in
-                for index in 0..<totalSamples {
-                    let sampleValue = isBigEndian ? Int16(bigEndian: samples[index]) : samples[index]
-                    let normalized = Double(sampleValue) / Double(Int16.max)
-                    sum += normalized * normalized
-                }
+            dataPointer.withMemoryRebound(to: Int16.self, capacity: frameCount * channelCount) { samples in
+                let (count, channelSum) = processInt16Samples(
+                    samples: samples,
+                    frameCount: frameCount,
+                    channelCount: channelCount,
+                    isNonInterleaved: isNonInterleaved,
+                    isBigEndian: isBigEndian
+                )
+                sampleCount = count
+                sum = channelSum
             }
         } else {
             return 0
         }
 
-        let rms = sqrt(sum / Double(totalSamples))
+        guard sampleCount > 0 else { return 0 }
+        let rms = sqrt(sum / Double(sampleCount))
         return CGFloat(levelFromDecibels(rms: rms))
     }
 
+    private nonisolated static func processFloatSamples(
+        samples: UnsafeMutablePointer<Float>,
+        frameCount: Int,
+        channelCount: Int,
+        isNonInterleaved: Bool
+    ) -> (sampleCount: Int, sum: Double) {
+        var sum: Double = 0
+        var sampleCount = 0
+
+        if isNonInterleaved {
+            for frame in 0..<frameCount {
+                for channel in 0..<channelCount {
+                    let sample = Double(samples[frame + channel * frameCount])
+                    sum += sample * sample
+                    sampleCount += 1
+                }
+            }
+        } else {
+            for index in 0..<(frameCount * channelCount) {
+                let sample = Double(samples[index])
+                sum += sample * sample
+                sampleCount += 1
+            }
+        }
+
+        return (sampleCount, sum)
+    }
+
+    private nonisolated static func processInt16Samples(
+        samples: UnsafeMutablePointer<Int16>,
+        frameCount: Int,
+        channelCount: Int,
+        isNonInterleaved: Bool,
+        isBigEndian: Bool
+    ) -> (sampleCount: Int, sum: Double) {
+        var sum: Double = 0
+        var sampleCount = 0
+
+        if isNonInterleaved {
+            for frame in 0..<frameCount {
+                for channel in 0..<channelCount {
+                    let rawValue = samples[frame + channel * frameCount]
+                    let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
+                    let normalized = Double(sampleValue) / Double(Int16.max)
+                    sum += normalized * normalized
+                    sampleCount += 1
+                }
+            }
+        } else {
+            for index in 0..<(frameCount * channelCount) {
+                let rawValue = samples[index]
+                let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
+                let normalized = Double(sampleValue) / Double(Int16.max)
+                sum += normalized * normalized
+                sampleCount += 1
+            }
+        }
+
+        return (sampleCount, sum)
+    }
+
     /// Converts an RMS value to a perceptual 0...1 level using a dB scale with a noise floor.
+    /// Uses a -50 dB floor and a square-root curve so low-level noise is less visible.
     private nonisolated static func levelFromDecibels(rms: Double) -> Double {
-        let minDb: Double = -60
+        let minDb: Double = -50
         let maxDb: Double = 0
 
         // Avoid log10(0)
         let db = 20 * log10(max(rms, 0.0000001))
         let clampedDb = min(max(db, minDb), maxDb)
-        return (clampedDb - minDb) / (maxDb - minDb)
+        let linear = (clampedDb - minDb) / (maxDb - minDb)
+        // Square-root curve suppresses low-level noise visually.
+        return sqrt(linear)
     }
 
     nonisolated static func defaultOutputDeviceName() -> String {
