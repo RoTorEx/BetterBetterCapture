@@ -74,8 +74,13 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             try FileManager.default.removeItem(at: url)
         }
 
-        // Create asset writer
-        let fileType = settings.containerFormat == .mov ? AVFileType.mov : AVFileType.mp4
+        // Create asset writer. Audio-only recordings use audio-focused file types.
+        let fileType: AVFileType
+        if settings.recordAudioOnly {
+            fileType = settings.audioCodec == .aac ? .mp4 : .wav
+        } else {
+            fileType = settings.containerFormat == .mov ? .mov : .mp4
+        }
         assetWriter = try AVAssetWriter(outputURL: url, fileType: fileType)
 
         guard let assetWriter else {
@@ -590,6 +595,13 @@ final class AudioLevelMonitor {
     private(set) var systemAudioLevel: CGFloat = 0
     private(set) var microphoneLevel: CGFloat = 0
 
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture",
+        category: "AudioLevelMonitor"
+    )
+    private static var lastLogDate = Date.distantPast
+    private static let logInterval: TimeInterval = 1.0
+
     nonisolated func processSystemAudioSample(_ sampleBuffer: CMSampleBuffer) {
         let level = Self.computeLevel(from: sampleBuffer)
         Task { @MainActor [weak self] in
@@ -681,7 +693,21 @@ final class AudioLevelMonitor {
 
         guard sampleCount > 0 else { return 0 }
         let rms = sqrt(sum / Double(sampleCount))
-        return CGFloat(levelFromDecibels(rms: rms))
+        let level = levelFromDecibels(rms: rms)
+
+        let now = Date()
+        if now.timeIntervalSince(Self.lastLogDate) >= Self.logInterval {
+            Self.lastLogDate = now
+            Self.logger.debug(
+                """
+                Audio level debug — format: float=\(isFloat), bits=\(bytesPerSample * 8), \
+                channels=\(channelCount), frames=\(frameCount), interleaved=\(!isNonInterleaved), \
+                rms=\(rms), level=\(level)
+                """
+            )
+        }
+
+        return CGFloat(level)
     }
 
     private nonisolated static func processFloatSamples(
