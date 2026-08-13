@@ -74,6 +74,20 @@ final class RecorderViewModel {
         }
     }
 
+    /// The name of the active system audio output device.
+    var systemAudioDeviceName: String {
+        AudioLevelMonitor.defaultOutputDeviceName()
+    }
+
+    /// The name of the active microphone input device. Falls back to the system's default input device name.
+    var microphoneDeviceName: String {
+        if let id = settings.selectedMicrophoneID,
+           let device = audioDeviceService.availableDevices.first(where: { $0.id == id }) {
+            return device.name
+        }
+        return AudioLevelMonitor.defaultInputDeviceName()
+    }
+
     /// Whether Presenter Overlay is currently active (camera composited into stream)
     private(set) var isPresenterOverlayActive = false
 

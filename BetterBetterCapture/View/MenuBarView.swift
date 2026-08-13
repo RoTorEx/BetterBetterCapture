@@ -142,6 +142,10 @@ struct MenuBarView: View {
                 AudioLevelMeterView(
                     outputLevel: viewModel.audioLevelMonitor.systemAudioLevel,
                     inputLevel: viewModel.audioLevelMonitor.microphoneLevel,
+                    outputDeviceName: { viewModel.systemAudioDeviceName },
+                    inputDeviceName: { viewModel.microphoneDeviceName },
+                    outputVolume: { AudioLevelMonitor.defaultOutputVolume() },
+                    inputVolume: { AudioLevelMonitor.defaultInputVolume() },
                     showOutput: viewModel.settings.captureSystemAudio,
                     showInput: viewModel.settings.captureMicrophone
                 )
@@ -518,13 +522,17 @@ struct RecordingModeSelector: View {
 struct AudioLevelMeterView: View {
     let outputLevel: CGFloat
     let inputLevel: CGFloat
+    let outputDeviceName: () -> String
+    let inputDeviceName: () -> String
+    let outputVolume: () -> Float?
+    let inputVolume: () -> Float?
     let showOutput: Bool
     let showInput: Bool
 
-    @State private var outputDeviceName = AudioLevelMonitor.defaultOutputDeviceName()
-    @State private var inputDeviceName = AudioLevelMonitor.defaultInputDeviceName()
-    @State private var outputVolume: Float?
-    @State private var inputVolume: Float?
+    @State private var displayedOutputDeviceName = ""
+    @State private var displayedInputDeviceName = ""
+    @State private var displayedOutputVolume: Float?
+    @State private var displayedInputVolume: Float?
     @State private var refreshTimer: Timer?
 
     var body: some View {
@@ -532,17 +540,17 @@ struct AudioLevelMeterView: View {
             if showOutput {
                 LevelMeterRow(
                     icon: "speaker.wave.2",
-                    label: outputDeviceName,
+                    label: displayedOutputDeviceName,
                     level: outputLevel,
-                    volume: outputVolume
+                    volume: displayedOutputVolume
                 )
             }
             if showInput {
                 LevelMeterRow(
                     icon: "mic",
-                    label: inputDeviceName,
+                    label: displayedInputDeviceName,
                     level: inputLevel,
-                    volume: inputVolume
+                    volume: displayedInputVolume
                 )
             }
         }
@@ -559,10 +567,10 @@ struct AudioLevelMeterView: View {
     }
 
     private func refreshAudioInfo() {
-        outputDeviceName = AudioLevelMonitor.defaultOutputDeviceName()
-        inputDeviceName = AudioLevelMonitor.defaultInputDeviceName()
-        outputVolume = AudioLevelMonitor.defaultOutputVolume()
-        inputVolume = AudioLevelMonitor.defaultInputVolume()
+        displayedOutputDeviceName = outputDeviceName()
+        displayedInputDeviceName = inputDeviceName()
+        displayedOutputVolume = outputVolume()
+        displayedInputVolume = inputVolume()
     }
 }
 
