@@ -378,9 +378,9 @@ final class RecorderViewModel {
             // Brief delay to ensure screen sharing mode has fully stopped before sending notification
             try? await Task.sleep(for: .milliseconds(100))
 
-            // Send notification. The file is kept either way - an audio-only recording is
-            // still worth more than a deleted one - but the user has to be told about it.
-            if videoFrameCount == 0 {
+            // Send notification. Audio-only recordings intentionally have no video frames,
+            // so treat them the same as successful screen recordings.
+            if videoFrameCount == 0 && !settings.recordAudioOnly {
                 logger.error("Recording contains no video frames: \(outputURL.lastPathComponent)")
                 notificationService.sendRecordingMissingVideoNotification(fileURL: outputURL)
             } else {
