@@ -1,6 +1,6 @@
-# Contributing to BetterCapture
+# Contributing to BetterBetterCapture
 
-Thank you for your interest in contributing to BetterCapture! We want to make this project the best macOS screen recorder, and we appreciate your help.
+Thank you for your interest in contributing to BetterBetterCapture! We want to make this project the best macOS screen recorder, and we appreciate your help.
 
 ## Feature Requests
 

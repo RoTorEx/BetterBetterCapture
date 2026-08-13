@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>BetterBetterCapture needs access to your microphone to record audio alongside screen captures.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BetterBetterCapture needs access to your camera to enable Presenter Overlay during screen recordings.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>BetterBetterCapture needs access to screen recording to capture your screen content.</string>
+	<key>SUPublicEDKey</key>
+	<string>SPARKLE_PUBLIC_KEY</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.betterbettercapture.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>betterbettercapture</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

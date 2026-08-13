@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="website/public/bettercapture-header.png" alt="BetterCapture Header">
+  <img src="website/public/bettercapture-header.png" alt="BetterBetterCapture Header">
 </p>
 
 <p align="center">
@@ -37,28 +37,28 @@
 ### Homebrew
 
 ```bash
-brew install bettercapture
+brew install bettercapture  # original BetterCapture package
 ```
 
 ### Direct Download
 
-Download the latest release from [GitHub Releases](https://github.com/jsattler/BetterCapture/releases/latest) and open `BetterCapture.dmg`.
+Download the latest release from [GitHub Releases](https://github.com/jsattler/BetterCapture/releases/latest) and open `BetterCapture.dmg` (original app).
 
 **Requirements**: macOS 15.2 (Sequoia) or later
 
 ## Automation
 
-BetterCapture supports a custom URL scheme for external tools (Raycast, Shortcuts, Alfred):
+BetterBetterCapture supports a custom URL scheme for external tools (Raycast, Shortcuts, Alfred):
 
 | URL | Action |
 |---|---|
-| `bettercapture://toggle` | Stop recording if active; otherwise open content selection (Pick Content or Select Area) before recording |
-| `bettercapture://open-recordings` | Open the output folder in Finder |
+| `betterbettercapture://toggle` | Stop recording if active; otherwise open content selection (Pick Content or Select Area) before recording |
+| `betterbettercapture://open-recordings` | Open the output folder in Finder |
 
 Example:
 
 ```bash
-open "bettercapture://toggle"
+open "betterbettercapture://toggle"
 ```
 
 ## Contributing
