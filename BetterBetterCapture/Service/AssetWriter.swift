@@ -608,7 +608,7 @@ final class AudioLevelMonitor {
 
     private nonisolated static func smooth(current: CGFloat, target: CGFloat) -> CGFloat {
         let attack: CGFloat = 0.6
-        let decay: CGFloat = 0.92
+        let decay: CGFloat = 0.8
 
         if target > current {
             return current * (1 - attack) + target * attack
@@ -746,10 +746,16 @@ final class AudioLevelMonitor {
     }
 
     /// Converts an RMS value to a perceptual 0...1 level using a dB scale with a noise floor.
-    /// Uses a -50 dB floor and a square-root curve so low-level noise is less visible.
+    /// Uses a -40 dB floor and a square-root curve so low-level noise is visually suppressed.
     private nonisolated static func levelFromDecibels(rms: Double) -> Double {
-        let minDb: Double = -50
+        let minDb: Double = -40
         let maxDb: Double = 0
+
+        // Hard silence gate: anything below -45 dB is treated as absolute silence.
+        let silenceThreshold: Double = 0.0056 // -45 dB
+        if rms < silenceThreshold {
+            return 0
+        }
 
         // Avoid log10(0)
         let db = 20 * log10(max(rms, 0.0000001))
