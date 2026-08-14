@@ -508,6 +508,15 @@ struct AudioSettingsSection: View {
             // System Audio Toggle
             MenuBarToggle(name: "Capture System Audio", isOn: $settings.captureSystemAudio)
 
+            // System Audio Gain Picker (only shown when system audio is enabled)
+            if settings.captureSystemAudio {
+                MenuBarExpandablePicker(
+                    name: "System Audio Gain",
+                    selection: $settings.systemAudioGain,
+                    options: AudioGainMode.allCases.map { ($0, $0.displayName) }
+                )
+            }
+
             // Microphone Toggle
             MenuBarToggle(name: "Capture Microphone", isOn: $settings.captureMicrophone)
 

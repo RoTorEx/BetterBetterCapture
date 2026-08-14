@@ -161,8 +161,8 @@ enum AudioBitrate: Int, CaseIterable, Identifiable {
     }
 }
 
-/// Microphone gain options. Auto measures the first seconds of audio and boosts to a target level.
-enum MicrophoneGain: String, CaseIterable, Identifiable {
+/// Audio gain options. Auto measures the first seconds of audio and boosts to a target level.
+enum AudioGainMode: String, CaseIterable, Identifiable {
     case auto = "Auto"
     case off = "Off"
     case boost10 = "+10 dB"
@@ -189,6 +189,9 @@ enum MicrophoneGain: String, CaseIterable, Identifiable {
         }
     }
 }
+
+// Backwards-compatible alias for the existing microphone-gain setting.
+typealias MicrophoneGain = AudioGainMode
 
 /// Frame rate options for recording
 enum FrameRate: Int, CaseIterable, Identifiable {
@@ -533,6 +536,15 @@ final class SettingsStore {
         }
     }
 
+    var systemAudioGain: AudioGainMode {
+        get {
+            AudioGainMode(rawValue: systemAudioGainRaw) ?? .auto
+        }
+        set {
+            systemAudioGainRaw = newValue.rawValue
+        }
+    }
+
     var selectedMicrophoneID: String? {
         get {
             access(keyPath: \.selectedMicrophoneID)
@@ -835,6 +847,18 @@ final class SettingsStore {
         set {
             withMutation(keyPath: \.microphoneGainRaw) {
                 defaults.set(newValue, forKey: "microphoneGain")
+            }
+        }
+    }
+
+    private var systemAudioGainRaw: String {
+        get {
+            access(keyPath: \.systemAudioGainRaw)
+            return defaults.string(forKey: "systemAudioGain") ?? AudioGainMode.auto.rawValue
+        }
+        set {
+            withMutation(keyPath: \.systemAudioGainRaw) {
+                defaults.set(newValue, forKey: "systemAudioGain")
             }
         }
     }

@@ -53,17 +53,10 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
     private weak var audioLevelMonitor: AudioLevelMonitor?
 
-    // MARK: - Microphone Gain
+    // MARK: - Audio Gain
 
-    private var microphoneGainMode: MicrophoneGain = .auto
-    private var autoGainMultiplier: Double = 1.0
-    private var isAutoGainCalibrated = false
-    private var autoGainRMSum: Double = 0
-    private var autoGainSampleCount: Int = 0
-    private var autoGainStartTime: CMTime = .invalid
-    private let autoGainCalibrationDuration: TimeInterval = 2.0
-    private let autoGainTargetRMS: Double = 0.1 // -20 dB
-    private let autoGainMaxMultiplier: Double = 31.6 // +30 dB
+    private var systemAudioGainState = AudioGainState(mode: .auto)
+    private var microphoneGainState = AudioGainState(mode: .auto)
 
     init(audioLevelMonitor: AudioLevelMonitor? = nil) {
         self.audioLevelMonitor = audioLevelMonitor
@@ -160,14 +153,16 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         lastVideoPresentationTime = .invalid
         frameCount = 0
 
-        microphoneGainMode = settings.microphoneGain
-        autoGainMultiplier = 1.0
-        isAutoGainCalibrated = false
-        autoGainRMSum = 0
-        autoGainSampleCount = 0
-        autoGainStartTime = .invalid
+        systemAudioGainState.reset(mode: settings.systemAudioGain)
+        microphoneGainState.reset(mode: settings.microphoneGain)
 
-        logger.info("AssetWriter configured for output: \(url.lastPathComponent), mic gain: \(settings.microphoneGain.displayName)")
+        logger.info(
+            """
+            AssetWriter configured for output: \(url.lastPathComponent), \
+            system gain: \(settings.systemAudioGain.displayName), \
+            mic gain: \(settings.microphoneGain.displayName)
+            """
+        )
     }
 
     // MARK: - Writing
@@ -296,9 +291,11 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
                 logger.info("Session started at time: \(presentationTime.seconds)")
             }
 
-            audioLevelMonitor?.processSystemAudioSample(sampleBuffer)
+            let processedBuffer = systemAudioGainState.process(sampleBuffer) ?? sampleBuffer
 
-            if !audioInput.append(sampleBuffer) {
+            audioLevelMonitor?.processSystemAudioSample(processedBuffer)
+
+            if !audioInput.append(processedBuffer) {
                 logger.error("Failed to append audio sample buffer")
             }
         }
@@ -315,7 +312,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
                 return
             }
 
-            let processedBuffer = processMicrophoneSampleBuffer(sampleBuffer) ?? sampleBuffer
+            let processedBuffer = microphoneGainState.process(sampleBuffer) ?? sampleBuffer
 
             audioLevelMonitor?.processMicrophoneSample(processedBuffer)
 
@@ -325,58 +322,137 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         }
     }
 
-    /// Applies the configured microphone gain to a sample buffer.
-    /// For `.auto` the first 2 seconds are measured and a multiplier is computed
-    /// to reach a target RMS of -20 dB, clamped to +30 dB.
-    private func processMicrophoneSampleBuffer(_ sampleBuffer: CMSampleBuffer) -> CMSampleBuffer? {
-        guard microphoneGainMode != .off else {
-            return sampleBuffer
+    // MARK: - Audio Gain Helpers
+
+    /// Holds state for automatic or fixed gain on one audio source.
+    private struct AudioGainState {
+        var mode: AudioGainMode
+
+        private var autoMultiplier: Double = 1.0
+        private var isCalibrated: Bool = false
+        private var rmsSum: Double = 0
+        private var sampleCount: Int = 0
+        private var startTime: CMTime = .invalid
+
+        private let calibrationDuration: TimeInterval = 2.0
+        private let targetRMS: Double = 0.1 // -20 dB
+        private let maxMultiplier: Double = 31.6 // +30 dB
+
+        init(mode: AudioGainMode) {
+            self.mode = mode
         }
 
-        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
-              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
-              let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)
-        else {
-            return nil
+        mutating func reset(mode: AudioGainMode) {
+            self.mode = mode
+            autoMultiplier = 1.0
+            isCalibrated = false
+            rmsSum = 0
+            sampleCount = 0
+            startTime = .invalid
         }
 
-        var dataPointer: UnsafeMutablePointer<Int8>?
-        var lengthAtOffset = 0
-        var totalLength = 0
-        let pointerStatus = CMBlockBufferGetDataPointer(
-            dataBuffer,
-            atOffset: 0,
-            lengthAtOffsetOut: &lengthAtOffset,
-            totalLengthOut: &totalLength,
-            dataPointerOut: &dataPointer
-        )
-        guard pointerStatus == noErr, let dataPointer, totalLength > 0 else {
-            return nil
-        }
+        /// Returns a new sample buffer with gain applied, or the original buffer
+        /// when no gain is required. Returns `nil` if the buffer cannot be parsed.
+        mutating func process(_ sampleBuffer: CMSampleBuffer) -> CMSampleBuffer? {
+            guard mode != .off else { return sampleBuffer }
 
-        let bytesPerFrame = Int(asbd.pointee.mBytesPerFrame)
-        let channelCount = Int(asbd.pointee.mChannelsPerFrame)
-        let frameCount = totalLength / bytesPerFrame
-        guard frameCount > 0, channelCount > 0 else {
-            return nil
-        }
+            guard let info = AudioGainState.parse(sampleBuffer) else { return nil }
 
-        let isFloat = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsFloat != 0
-        let isBigEndian = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsBigEndian != 0
-        let isNonInterleaved = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsNonInterleaved != 0
-        let bytesPerSample = Int(asbd.pointee.mBitsPerChannel) / 8
-        let totalSamples = frameCount * channelCount
+            let multiplier: Double
+            if mode == .auto {
+                let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                if !startTime.isValid {
+                    startTime = presentationTime
+                }
+                let elapsed = presentationTime.seconds - startTime.seconds
 
-        let multiplier: Double
-        if microphoneGainMode == .auto {
-            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-            if !autoGainStartTime.isValid {
-                autoGainStartTime = presentationTime
+                rmsSum += info.sumOfSquares
+                sampleCount += info.sampleCount
+
+                if !isCalibrated && elapsed >= calibrationDuration {
+                    calibrate()
+                }
+
+                multiplier = isCalibrated ? autoMultiplier : 1.0
+            } else {
+                multiplier = mode.linearGain
             }
-            let elapsed = presentationTime.seconds - autoGainStartTime.seconds
 
-            // Accumulate raw level for calibration before applying any boost.
-            let (sum, count) = computeRawSum(
+            guard multiplier != 1.0 else { return sampleBuffer }
+
+            return AudioGainState.applyGain(to: sampleBuffer, info: info, multiplier: multiplier)
+        }
+
+        private mutating func calibrate() {
+            guard sampleCount > 0 else {
+                isCalibrated = true
+                return
+            }
+            let averageRMS = sqrt(rmsSum / Double(sampleCount))
+            let computed = averageRMS > 0 ? targetRMS / averageRMS : 1.0
+            autoMultiplier = max(1.0, min(computed, maxMultiplier))
+            isCalibrated = true
+        }
+
+        private struct BufferInfo {
+            let formatDescription: CMAudioFormatDescription
+            let dataPointer: UnsafeMutablePointer<Int8>
+            let totalLength: Int
+            let totalSamples: Int
+            let frameCount: Int
+            let channelCount: Int
+            let isFloat: Bool
+            let isBigEndian: Bool
+            let isNonInterleaved: Bool
+            let bytesPerSample: Int
+            let numSamples: Int
+            let timingInfo: CMSampleTimingInfo
+            let sumOfSquares: Double
+            let sampleCount: Int
+        }
+
+        private static func parse(_ sampleBuffer: CMSampleBuffer) -> BufferInfo? {
+            guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+                  let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
+                  let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)
+            else {
+                return nil
+            }
+
+            var dataPointer: UnsafeMutablePointer<Int8>?
+            var lengthAtOffset = 0
+            var totalLength = 0
+            let pointerStatus = CMBlockBufferGetDataPointer(
+                dataBuffer,
+                atOffset: 0,
+                lengthAtOffsetOut: &lengthAtOffset,
+                totalLengthOut: &totalLength,
+                dataPointerOut: &dataPointer
+            )
+            guard pointerStatus == noErr, let dataPointer, totalLength > 0 else {
+                return nil
+            }
+
+            let bytesPerFrame = Int(asbd.pointee.mBytesPerFrame)
+            let channelCount = Int(asbd.pointee.mChannelsPerFrame)
+            let frameCount = totalLength / bytesPerFrame
+            guard frameCount > 0, channelCount > 0 else {
+                return nil
+            }
+
+            let isFloat = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsFloat != 0
+            let isBigEndian = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsBigEndian != 0
+            let isNonInterleaved = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsNonInterleaved != 0
+            let bytesPerSample = Int(asbd.pointee.mBitsPerChannel) / 8
+            let totalSamples = frameCount * channelCount
+
+            let numSamples = CMSampleBufferGetNumSamples(sampleBuffer)
+            var timingInfo = CMSampleTimingInfo()
+            guard CMSampleBufferGetSampleTimingInfo(sampleBuffer, at: 0, timingInfoOut: &timingInfo) == noErr else {
+                return nil
+            }
+
+            let (sum, count) = computeSum(
                 dataPointer: dataPointer,
                 totalSamples: totalSamples,
                 frameCount: frameCount,
@@ -386,219 +462,178 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
                 isBigEndian: isBigEndian,
                 isNonInterleaved: isNonInterleaved
             )
-            autoGainRMSum += sum
-            autoGainSampleCount += count
 
-            if !isAutoGainCalibrated && elapsed >= autoGainCalibrationDuration {
-                calibrateAutoGain()
-            }
-
-            multiplier = isAutoGainCalibrated ? autoGainMultiplier : 1.0
-        } else {
-            multiplier = microphoneGainMode.linearGain
+            return BufferInfo(
+                formatDescription: formatDescription,
+                dataPointer: dataPointer,
+                totalLength: totalLength,
+                totalSamples: totalSamples,
+                frameCount: frameCount,
+                channelCount: channelCount,
+                isFloat: isFloat,
+                isBigEndian: isBigEndian,
+                isNonInterleaved: isNonInterleaved,
+                bytesPerSample: bytesPerSample,
+                numSamples: numSamples,
+                timingInfo: timingInfo,
+                sumOfSquares: sum,
+                sampleCount: count
+            )
         }
 
-        guard multiplier != 1.0 else {
-            return sampleBuffer
-        }
+        private static func computeSum(
+            dataPointer: UnsafeMutablePointer<Int8>,
+            totalSamples: Int,
+            frameCount: Int,
+            channelCount: Int,
+            isFloat: Bool,
+            bytesPerSample: Int,
+            isBigEndian: Bool,
+            isNonInterleaved: Bool
+        ) -> (sum: Double, count: Int) {
+            var sum: Double = 0
+            var count: Int = 0
 
-        return createGainAppliedSampleBuffer(
-            from: sampleBuffer,
-            dataPointer: dataPointer,
-            totalLength: totalLength,
-            totalSamples: totalSamples,
-            frameCount: frameCount,
-            channelCount: channelCount,
-            isFloat: isFloat,
-            bytesPerSample: bytesPerSample,
-            isBigEndian: isBigEndian,
-            isNonInterleaved: isNonInterleaved,
-            multiplier: multiplier
-        )
-    }
-
-    private func calibrateAutoGain() {
-        guard autoGainSampleCount > 0 else {
-            isAutoGainCalibrated = true
-            return
-        }
-        let averageRMS = sqrt(autoGainRMSum / Double(autoGainSampleCount))
-        let computed = averageRMS > 0 ? autoGainTargetRMS / averageRMS : 1.0
-        autoGainMultiplier = max(1.0, min(computed, autoGainMaxMultiplier))
-        isAutoGainCalibrated = true
-        logger.info(
-            "Microphone auto-gain calibrated: avg RMS \(averageRMS), multiplier \(self.autoGainMultiplier)"
-        )
-    }
-
-    private func computeRawSum(
-        dataPointer: UnsafeMutablePointer<Int8>,
-        totalSamples: Int,
-        frameCount: Int,
-        channelCount: Int,
-        isFloat: Bool,
-        bytesPerSample: Int,
-        isBigEndian: Bool,
-        isNonInterleaved: Bool
-    ) -> (sum: Double, count: Int) {
-        var sum: Double = 0
-        var count: Int = 0
-
-        if isFloat && bytesPerSample == MemoryLayout<Float>.size {
-            dataPointer.withMemoryRebound(to: Float.self, capacity: totalSamples) { samples in
-                if isNonInterleaved {
-                    for frame in 0..<frameCount {
-                        for channel in 0..<channelCount {
-                            let sample = Double(samples[frame + channel * frameCount])
+            if isFloat && bytesPerSample == MemoryLayout<Float>.size {
+                dataPointer.withMemoryRebound(to: Float.self, capacity: totalSamples) { samples in
+                    if isNonInterleaved {
+                        for frame in 0..<frameCount {
+                            for channel in 0..<channelCount {
+                                let sample = Double(samples[frame + channel * frameCount])
+                                sum += sample * sample
+                                count += 1
+                            }
+                        }
+                    } else {
+                        for index in 0..<totalSamples {
+                            let sample = Double(samples[index])
                             sum += sample * sample
                             count += 1
                         }
                     }
-                } else {
-                    for index in 0..<totalSamples {
-                        let sample = Double(samples[index])
-                        sum += sample * sample
-                        count += 1
-                    }
                 }
-            }
-        } else if !isFloat && bytesPerSample == MemoryLayout<Int16>.size {
-            dataPointer.withMemoryRebound(to: Int16.self, capacity: totalSamples) { samples in
-                if isNonInterleaved {
-                    for frame in 0..<frameCount {
-                        for channel in 0..<channelCount {
-                            let rawValue = samples[frame + channel * frameCount]
+            } else if !isFloat && bytesPerSample == MemoryLayout<Int16>.size {
+                dataPointer.withMemoryRebound(to: Int16.self, capacity: totalSamples) { samples in
+                    if isNonInterleaved {
+                        for frame in 0..<frameCount {
+                            for channel in 0..<channelCount {
+                                let rawValue = samples[frame + channel * frameCount]
+                                let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
+                                let normalized = Double(sampleValue) / Double(Int16.max)
+                                sum += normalized * normalized
+                                count += 1
+                            }
+                        }
+                    } else {
+                        for index in 0..<totalSamples {
+                            let rawValue = samples[index]
                             let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
                             let normalized = Double(sampleValue) / Double(Int16.max)
                             sum += normalized * normalized
                             count += 1
                         }
                     }
-                } else {
-                    for index in 0..<totalSamples {
-                        let rawValue = samples[index]
-                        let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
-                        let normalized = Double(sampleValue) / Double(Int16.max)
-                        sum += normalized * normalized
-                        count += 1
-                    }
                 }
             }
+
+            return (sum, count)
         }
 
-        return (sum, count)
-    }
+        private static func applyGain(
+            to sampleBuffer: CMSampleBuffer,
+            info: BufferInfo,
+            multiplier: Double
+        ) -> CMSampleBuffer? {
+            guard let memory = CFAllocatorAllocate(kCFAllocatorDefault, info.totalLength, 0) else {
+                return nil
+            }
 
-    private func createGainAppliedSampleBuffer(
-        from sampleBuffer: CMSampleBuffer,
-        dataPointer: UnsafeMutablePointer<Int8>,
-        totalLength: Int,
-        totalSamples: Int,
-        frameCount: Int,
-        channelCount: Int,
-        isFloat: Bool,
-        bytesPerSample: Int,
-        isBigEndian: Bool,
-        isNonInterleaved: Bool,
-        multiplier: Double
-    ) -> CMSampleBuffer? {
-        guard let memory = CFAllocatorAllocate(kCFAllocatorDefault, totalLength, 0) else {
-            return nil
-        }
-
-        if isFloat && bytesPerSample == MemoryLayout<Float>.size {
-            dataPointer.withMemoryRebound(to: Float.self, capacity: totalSamples) { source in
-                let destination = memory.assumingMemoryBound(to: Float.self)
-                if isNonInterleaved {
-                    for frame in 0..<frameCount {
-                        for channel in 0..<channelCount {
-                            let index = frame + channel * frameCount
+            if info.isFloat && info.bytesPerSample == MemoryLayout<Float>.size {
+                info.dataPointer.withMemoryRebound(to: Float.self, capacity: info.totalSamples) { source in
+                    let destination = memory.assumingMemoryBound(to: Float.self)
+                    if info.isNonInterleaved {
+                        for frame in 0..<info.frameCount {
+                            for channel in 0..<info.channelCount {
+                                let index = frame + channel * info.frameCount
+                                let scaled = Double(source[index]) * multiplier
+                                destination[index] = Float(max(-1.0, min(1.0, scaled)))
+                            }
+                        }
+                    } else {
+                        for index in 0..<info.totalSamples {
                             let scaled = Double(source[index]) * multiplier
                             destination[index] = Float(max(-1.0, min(1.0, scaled)))
                         }
                     }
-                } else {
-                    for index in 0..<totalSamples {
-                        let scaled = Double(source[index]) * multiplier
-                        destination[index] = Float(max(-1.0, min(1.0, scaled)))
-                    }
                 }
-            }
-        } else if !isFloat && bytesPerSample == MemoryLayout<Int16>.size {
-            dataPointer.withMemoryRebound(to: Int16.self, capacity: totalSamples) { source in
-                let destination = memory.assumingMemoryBound(to: Int16.self)
-                if isNonInterleaved {
-                    for frame in 0..<frameCount {
-                        for channel in 0..<channelCount {
-                            let index = frame + channel * frameCount
+            } else if !info.isFloat && info.bytesPerSample == MemoryLayout<Int16>.size {
+                info.dataPointer.withMemoryRebound(to: Int16.self, capacity: info.totalSamples) { source in
+                    let destination = memory.assumingMemoryBound(to: Int16.self)
+                    if info.isNonInterleaved {
+                        for frame in 0..<info.frameCount {
+                            for channel in 0..<info.channelCount {
+                                let index = frame + channel * info.frameCount
+                                let rawValue = source[index]
+                                let sampleValue = info.isBigEndian ? Int16(bigEndian: rawValue) : rawValue
+                                let scaled = Double(sampleValue) * multiplier
+                                let clamped = Int16(max(Double(Int16.min), min(Double(Int16.max), scaled)))
+                                destination[index] = info.isBigEndian ? clamped.bigEndian : clamped
+                            }
+                        }
+                    } else {
+                        for index in 0..<info.totalSamples {
                             let rawValue = source[index]
-                            let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
+                            let sampleValue = info.isBigEndian ? Int16(bigEndian: rawValue) : rawValue
                             let scaled = Double(sampleValue) * multiplier
                             let clamped = Int16(max(Double(Int16.min), min(Double(Int16.max), scaled)))
-                            destination[index] = isBigEndian ? clamped.bigEndian : clamped
+                            destination[index] = info.isBigEndian ? clamped.bigEndian : clamped
                         }
                     }
-                } else {
-                    for index in 0..<totalSamples {
-                        let rawValue = source[index]
-                        let sampleValue = isBigEndian ? Int16(bigEndian: rawValue) : rawValue
-                        let scaled = Double(sampleValue) * multiplier
-                        let clamped = Int16(max(Double(Int16.min), min(Double(Int16.max), scaled)))
-                        destination[index] = isBigEndian ? clamped.bigEndian : clamped
-                    }
                 }
+            } else {
+                CFAllocatorDeallocate(kCFAllocatorDefault, memory)
+                return nil
             }
-        } else {
-            CFAllocatorDeallocate(kCFAllocatorDefault, memory)
-            return nil
-        }
 
-        var blockBuffer: CMBlockBuffer?
-        let blockStatus = CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault,
-            memoryBlock: memory,
-            blockLength: totalLength,
-            blockAllocator: kCFAllocatorDefault,
-            customBlockSource: nil,
-            offsetToData: 0,
-            dataLength: totalLength,
-            flags: 0,
-            blockBufferOut: &blockBuffer
-        )
-        guard blockStatus == noErr, let blockBuffer else {
-            CFAllocatorDeallocate(kCFAllocatorDefault, memory)
-            return nil
-        }
+            var blockBuffer: CMBlockBuffer?
+            let blockStatus = CMBlockBufferCreateWithMemoryBlock(
+                allocator: kCFAllocatorDefault,
+                memoryBlock: memory,
+                blockLength: info.totalLength,
+                blockAllocator: kCFAllocatorDefault,
+                customBlockSource: nil,
+                offsetToData: 0,
+                dataLength: info.totalLength,
+                flags: 0,
+                blockBufferOut: &blockBuffer
+            )
+            guard blockStatus == noErr, let blockBuffer else {
+                CFAllocatorDeallocate(kCFAllocatorDefault, memory)
+                return nil
+            }
 
-        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else {
-            return nil
-        }
-        let numSamples = CMSampleBufferGetNumSamples(sampleBuffer)
-        var timingInfo = CMSampleTimingInfo()
-        guard CMSampleBufferGetSampleTimingInfo(sampleBuffer, at: 0, timingInfoOut: &timingInfo) == noErr else {
-            return nil
-        }
+            var newSampleBuffer: CMSampleBuffer?
+            var timingInfo = info.timingInfo
+            let sampleStatus = CMSampleBufferCreate(
+                allocator: kCFAllocatorDefault,
+                dataBuffer: blockBuffer,
+                dataReady: true,
+                makeDataReadyCallback: nil,
+                refcon: nil,
+                formatDescription: info.formatDescription,
+                sampleCount: info.numSamples,
+                sampleTimingEntryCount: 1,
+                sampleTimingArray: &timingInfo,
+                sampleSizeEntryCount: 0,
+                sampleSizeArray: nil,
+                sampleBufferOut: &newSampleBuffer
+            )
+            guard sampleStatus == noErr, let newSampleBuffer else {
+                return nil
+            }
 
-        var newSampleBuffer: CMSampleBuffer?
-        let sampleStatus = CMSampleBufferCreate(
-            allocator: kCFAllocatorDefault,
-            dataBuffer: blockBuffer,
-            dataReady: true,
-            makeDataReadyCallback: nil,
-            refcon: nil,
-            formatDescription: formatDescription,
-            sampleCount: numSamples,
-            sampleTimingEntryCount: 1,
-            sampleTimingArray: &timingInfo,
-            sampleSizeEntryCount: 0,
-            sampleSizeArray: nil,
-            sampleBufferOut: &newSampleBuffer
-        )
-        guard sampleStatus == noErr, let newSampleBuffer else {
-            return nil
+            return newSampleBuffer
         }
-
-        return newSampleBuffer
     }
 
     // MARK: - Finalization

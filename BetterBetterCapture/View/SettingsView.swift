@@ -181,6 +181,16 @@ struct AudioSettingsView: View {
                     .help("Record audio from the default microphone input")
             }
 
+            Section("System Audio") {
+                Picker("Gain", selection: $settings.systemAudioGain) {
+                    ForEach(AudioGainMode.allCases) { gain in
+                        Text(gain.displayName).tag(gain)
+                    }
+                }
+                .help("Auto automatically boosts quiet system audio to match the microphone")
+                .disabled(!settings.captureSystemAudio)
+            }
+
             Section("Microphone") {
                 Picker("Gain", selection: $settings.microphoneGain) {
                     ForEach(MicrophoneGain.allCases) { gain in
