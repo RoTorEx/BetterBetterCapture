@@ -430,7 +430,10 @@ final class SettingsStore {
     var captureMicrophone: Bool {
         get {
             access(keyPath: \.captureMicrophone)
-            return defaults.bool(forKey: "captureMicrophone")
+            // Default to true so first-time users don't accidentally record without their voice.
+            return defaults.object(forKey: "captureMicrophone") != nil
+                ? defaults.bool(forKey: "captureMicrophone")
+                : true
         }
         set {
             withMutation(keyPath: \.captureMicrophone) {
@@ -442,7 +445,10 @@ final class SettingsStore {
     var captureSystemAudio: Bool {
         get {
             access(keyPath: \.captureSystemAudio)
-            return defaults.bool(forKey: "captureSystemAudio")
+            // Default to true so calls and system audio are captured by default.
+            return defaults.object(forKey: "captureSystemAudio") != nil
+                ? defaults.bool(forKey: "captureSystemAudio")
+                : true
         }
         set {
             withMutation(keyPath: \.captureSystemAudio) {

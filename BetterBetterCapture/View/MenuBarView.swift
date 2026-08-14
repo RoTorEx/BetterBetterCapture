@@ -30,6 +30,15 @@ struct MenuBarView: View {
                 MenuBarDivider()
             }
 
+            // Warning when audio-only mode is active but microphone capture is off.
+            // Without this the user would record only the remote side of calls.
+            if !isRecording,
+               viewModel.settings.recordAudioOnly,
+               !viewModel.settings.captureMicrophone {
+                MicrophoneDisabledWarning()
+                MenuBarDivider()
+            }
+
             // Recording button (stop) or Start button
             if isRecording {
                 MenuBarActionButton(
@@ -610,6 +619,26 @@ struct LevelMeterRow: View {
             }
             .frame(height: 6)
         }
+    }
+}
+
+// MARK: - Microphone Disabled Warning
+
+/// A warning banner shown in Audio-only mode when microphone capture is disabled.
+struct MicrophoneDisabledWarning: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text("Your microphone is off. Only the other side of the call will be recorded.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.orange.opacity(0.1))
     }
 }
 
