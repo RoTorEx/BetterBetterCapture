@@ -595,12 +595,12 @@ final class AudioLevelMonitor {
     private(set) var systemAudioLevel: CGFloat = 0
     private(set) var microphoneLevel: CGFloat = 0
 
-    private static let logger = Logger(
+    nonisolated private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture",
         category: "AudioLevelMonitor"
     )
-    private static var lastLogDate = Date.distantPast
-    private static let logInterval: TimeInterval = 1.0
+    nonisolated private static var lastLogDate = Date.distantPast
+    nonisolated private static let logInterval: TimeInterval = 1.0
 
     nonisolated func processSystemAudioSample(_ sampleBuffer: CMSampleBuffer) {
         let level = Self.computeLevel(from: sampleBuffer)
