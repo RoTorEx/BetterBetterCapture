@@ -517,6 +517,12 @@ struct AudioSettingsSection: View {
                     selectedID: $settings.selectedMicrophoneID,
                     devices: audioDeviceService.availableDevices
                 )
+
+                MenuBarExpandablePicker(
+                    name: "Microphone Gain",
+                    selection: $settings.microphoneGain,
+                    options: MicrophoneGain.allCases.map { ($0, $0.displayName) }
+                )
             }
 
             // Audio Codec Picker (shows all codecs, disables incompatible ones)

@@ -161,6 +161,35 @@ enum AudioBitrate: Int, CaseIterable, Identifiable {
     }
 }
 
+/// Microphone gain options. Auto measures the first seconds of audio and boosts to a target level.
+enum MicrophoneGain: String, CaseIterable, Identifiable {
+    case auto = "Auto"
+    case off = "Off"
+    case boost10 = "+10 dB"
+    case boost20 = "+20 dB"
+    case boost30 = "+30 dB"
+
+    var id: String { rawValue }
+
+    var displayName: String { rawValue }
+
+    /// Fixed linear multiplier for manual boost modes. Auto returns 1.0 (calculated dynamically).
+    var linearGain: Double {
+        switch self {
+        case .auto:
+            return 1.0
+        case .off:
+            return 1.0
+        case .boost10:
+            return pow(10.0, 10.0 / 20.0)
+        case .boost20:
+            return pow(10.0, 20.0 / 20.0)
+        case .boost30:
+            return pow(10.0, 30.0 / 20.0)
+        }
+    }
+}
+
 /// Frame rate options for recording
 enum FrameRate: Int, CaseIterable, Identifiable {
     case native = 0
@@ -495,6 +524,15 @@ final class SettingsStore {
         }
     }
 
+    var microphoneGain: MicrophoneGain {
+        get {
+            MicrophoneGain(rawValue: microphoneGainRaw) ?? .auto
+        }
+        set {
+            microphoneGainRaw = newValue.rawValue
+        }
+    }
+
     var selectedMicrophoneID: String? {
         get {
             access(keyPath: \.selectedMicrophoneID)
@@ -785,6 +823,18 @@ final class SettingsStore {
         set {
             withMutation(keyPath: \.audioBitrateRaw) {
                 defaults.set(newValue, forKey: "audioBitrate")
+            }
+        }
+    }
+
+    private var microphoneGainRaw: String {
+        get {
+            access(keyPath: \.microphoneGainRaw)
+            return defaults.string(forKey: "microphoneGain") ?? MicrophoneGain.auto.rawValue
+        }
+        set {
+            withMutation(keyPath: \.microphoneGainRaw) {
+                defaults.set(newValue, forKey: "microphoneGain")
             }
         }
     }
