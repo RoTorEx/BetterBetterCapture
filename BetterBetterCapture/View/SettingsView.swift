@@ -13,6 +13,8 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settings: SettingsStore
     var updaterService: UpdaterService
+    let audioDeviceService: AudioDeviceService
+    let cameraDeviceService: CameraDeviceService
 
     var body: some View {
         TabView {
@@ -25,7 +27,11 @@ struct SettingsView: View {
             }
 
             Tab("Audio", systemImage: "waveform") {
-                AudioSettingsView(settings: settings)
+                AudioSettingsView(settings: settings, audioDeviceService: audioDeviceService)
+            }
+
+            Tab("Camera", systemImage: "camera") {
+                CameraSettingsView(settings: settings, cameraDeviceService: cameraDeviceService)
             }
 
             Tab("Shortcuts", systemImage: "keyboard") {
@@ -170,6 +176,7 @@ struct VideoSettingsView: View {
 
 struct AudioSettingsView: View {
     @Bindable var settings: SettingsStore
+    let audioDeviceService: AudioDeviceService
 
     var body: some View {
         Form {
@@ -178,7 +185,7 @@ struct AudioSettingsView: View {
                     .help("Record audio from applications and system sounds")
 
                 Toggle("Capture Microphone", isOn: $settings.captureMicrophone)
-                    .help("Record audio from the default microphone input")
+                    .help("Record audio from the selected microphone input")
             }
 
             Section("System Audio") {
@@ -192,6 +199,14 @@ struct AudioSettingsView: View {
             }
 
             Section("Microphone") {
+                Picker("Device", selection: $settings.selectedMicrophoneID) {
+                    Text("System Default").tag(nil as String?)
+                    ForEach(audioDeviceService.availableDevices) { device in
+                        Text(device.name).tag(device.id as String?)
+                    }
+                }
+                .disabled(!settings.captureMicrophone)
+
                 Picker("Gain", selection: $settings.microphoneGain) {
                     ForEach(MicrophoneGain.allCases) { gain in
                         Text(gain.displayName).tag(gain)
@@ -230,6 +245,32 @@ struct AudioSettingsView: View {
                 Text("Audio tracks are recorded separately for post-processing flexibility.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// MARK: - Camera Settings
+
+struct CameraSettingsView: View {
+    @Bindable var settings: SettingsStore
+    let cameraDeviceService: CameraDeviceService
+
+    var body: some View {
+        Form {
+            Section("Presenter Overlay") {
+                Toggle("Presenter Overlay", isOn: $settings.presenterOverlayEnabled)
+                    .help("Start the selected camera during recording so macOS can offer Presenter Overlay.")
+
+                Picker("Camera", selection: $settings.selectedCameraID) {
+                    Text("System Default").tag(nil as String?)
+                    ForEach(cameraDeviceService.availableDevices) { device in
+                        Text(device.name).tag(device.id as String?)
+                    }
+                }
+                .disabled(!settings.presenterOverlayEnabled)
             }
         }
         .formStyle(.grouped)
@@ -346,5 +387,10 @@ struct AboutSection: View {
 // MARK: - Preview
 
 #Preview {
-    SettingsView(settings: SettingsStore(), updaterService: UpdaterService())
+    SettingsView(
+        settings: SettingsStore(),
+        updaterService: UpdaterService(),
+        audioDeviceService: AudioDeviceService(),
+        cameraDeviceService: CameraDeviceService()
+    )
 }

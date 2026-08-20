@@ -118,6 +118,33 @@ struct AssetWriterTests {
         }
     }
 
+    @Test func audioStatisticsReadNonInterleavedBuffers() throws {
+        let sampleBuffer = try makeNonInterleavedFloatAudioSampleBuffer(
+            leftSample: 0.25,
+            rightSample: 0.5
+        )
+
+        let statistics = try #require(AudioSampleBufferProcessor.statistics(from: sampleBuffer))
+
+        #expect(statistics.sampleCount == 8)
+        #expect(abs(statistics.sumOfSquares - 1.25) < 0.0001)
+    }
+
+    @Test func gainProcessingPreservesNonInterleavedSamples() throws {
+        let sampleBuffer = try makeNonInterleavedFloatAudioSampleBuffer(
+            leftSample: 0.25,
+            rightSample: 0.5
+        )
+
+        let processedBuffer = try #require(
+            AudioSampleBufferProcessor.applyingGain(to: sampleBuffer, multiplier: 1.5)
+        )
+        let statistics = try #require(AudioSampleBufferProcessor.statistics(from: processedBuffer))
+
+        #expect(statistics.sampleCount == 8)
+        #expect(abs(statistics.sumOfSquares - 2.8125) < 0.0001)
+    }
+
     // MARK: - Helpers
 
     /// Creates a SettingsStore backed by a fresh, empty UserDefaults suite.
@@ -144,6 +171,62 @@ struct AssetWriterTests {
         var timing = CMSampleTimingInfo(
             duration: CMTime(value: 1, timescale: 48000),
             presentationTimeStamp: presentationTime,
+            decodeTimeStamp: .invalid
+        )
+
+        var sampleBuffer: CMSampleBuffer?
+        let createStatus = CMSampleBufferCreate(
+            allocator: kCFAllocatorDefault,
+            dataBuffer: nil,
+            dataReady: false,
+            makeDataReadyCallback: nil,
+            refcon: nil,
+            formatDescription: format.formatDescription,
+            sampleCount: CMItemCount(frameCount),
+            sampleTimingEntryCount: 1,
+            sampleTimingArray: &timing,
+            sampleSizeEntryCount: 0,
+            sampleSizeArray: nil,
+            sampleBufferOut: &sampleBuffer
+        )
+        #expect(createStatus == noErr)
+
+        let buffer = try #require(sampleBuffer)
+        let attachStatus = CMSampleBufferSetDataBufferFromAudioBufferList(
+            buffer,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: 0,
+            bufferList: pcmBuffer.mutableAudioBufferList
+        )
+        #expect(attachStatus == noErr)
+
+        return buffer
+    }
+
+    /// Creates a small non-interleaved stereo buffer with constant channel values.
+    private func makeNonInterleavedFloatAudioSampleBuffer(
+        leftSample: Float,
+        rightSample: Float
+    ) throws -> CMSampleBuffer {
+        let frameCount: AVAudioFrameCount = 4
+
+        let format = try #require(
+            AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 2, interleaved: false)
+        )
+        let pcmBuffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount))
+        pcmBuffer.frameLength = frameCount
+
+        let leftChannel = try #require(pcmBuffer.floatChannelData?[0])
+        let rightChannel = try #require(pcmBuffer.floatChannelData?[1])
+        for frame in 0..<Int(frameCount) {
+            leftChannel[frame] = leftSample
+            rightChannel[frame] = rightSample
+        }
+
+        var timing = CMSampleTimingInfo(
+            duration: CMTime(value: 1, timescale: 48000),
+            presentationTimeStamp: .zero,
             decodeTimeStamp: .invalid
         )
 

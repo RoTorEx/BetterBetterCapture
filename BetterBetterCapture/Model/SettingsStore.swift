@@ -161,7 +161,7 @@ enum AudioBitrate: Int, CaseIterable, Identifiable {
     }
 }
 
-/// Audio gain options. Auto measures the first seconds of audio and boosts to a target level.
+/// Audio gain options. Auto measures detected speech and gently boosts it to a target level.
 enum AudioGainMode: String, CaseIterable, Identifiable {
     case auto = "Auto"
     case off = "Off"
@@ -538,7 +538,7 @@ final class SettingsStore {
 
     var systemAudioGain: AudioGainMode {
         get {
-            AudioGainMode(rawValue: systemAudioGainRaw) ?? .auto
+            AudioGainMode(rawValue: systemAudioGainRaw) ?? .off
         }
         set {
             systemAudioGainRaw = newValue.rawValue
@@ -854,7 +854,7 @@ final class SettingsStore {
     private var systemAudioGainRaw: String {
         get {
             access(keyPath: \.systemAudioGainRaw)
-            return defaults.string(forKey: "systemAudioGain") ?? AudioGainMode.auto.rawValue
+            return defaults.string(forKey: "systemAudioGain") ?? AudioGainMode.off.rawValue
         }
         set {
             withMutation(keyPath: \.systemAudioGainRaw) {

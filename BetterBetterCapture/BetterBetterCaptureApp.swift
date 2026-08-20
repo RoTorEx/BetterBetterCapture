@@ -32,7 +32,12 @@ struct BetterBetterCaptureApp: App {
 
         // Settings window
         Settings {
-            SettingsView(settings: viewModel.settings, updaterService: updaterService)
+            SettingsView(
+                settings: viewModel.settings,
+                updaterService: updaterService,
+                audioDeviceService: viewModel.audioDeviceService,
+                cameraDeviceService: viewModel.cameraDeviceService
+            )
         }
     }
 
@@ -107,14 +112,23 @@ struct MenuBarLabel: View {
     let viewModel: RecorderViewModel
 
     var body: some View {
-        Image(systemName: menuBarIconName)
-            .foregroundStyle(viewModel.isRecording ? .red : .primary)
+        if let recordingIconName {
+            Image(systemName: recordingIconName)
+                .foregroundStyle(.red)
+        } else {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .foregroundStyle(.primary)
+        }
     }
 
-    private var menuBarIconName: String {
+    private var recordingIconName: String? {
         if viewModel.isRecording {
             return viewModel.settings.recordAudioOnly ? "mic.circle.fill" : "video.circle.fill"
         }
-        return "film"
+        return nil
     }
 }
