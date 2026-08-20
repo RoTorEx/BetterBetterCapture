@@ -270,6 +270,9 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var audioInput: AVAssetWriterInput?
     private var microphoneInput: AVAssetWriterInput?
+    private var shouldMixAudioTracks = false
+    private var activeAudioCodec: AudioCodec = .aac
+    private var activeAudioBitrate: AudioBitrate = .standard
 
     private(set) var isWriting = false
     private(set) var outputURL: URL?
@@ -401,6 +404,11 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
         systemAudioGainState.reset(mode: settings.systemAudioGain)
         microphoneGainState.reset(mode: settings.microphoneGain)
+        shouldMixAudioTracks = settings.recordAudioOnly
+            && settings.captureSystemAudio
+            && settings.captureMicrophone
+        activeAudioCodec = settings.audioCodec
+        activeAudioBitrate = settings.audioBitrate
 
         logger.info(
             """
@@ -693,7 +701,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         await writerToFinish.finishWriting()
 
         // Second critical section: check final status and cleanup
-        return try lock.withLockUnchecked {
+        let result: (url: URL, videoFrameCount: Int) = try lock.withLockUnchecked {
             guard let assetWriter else {
                 throw AssetWriterError.writerNotReady
             }
@@ -726,6 +734,17 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
             return (url, videoFrameCount)
         }
+
+        if shouldMixAudioTracks {
+            try await AudioTrackMixer.mixTracks(
+                in: result.url,
+                codec: activeAudioCodec,
+                bitrate: activeAudioBitrate
+            )
+        }
+
+        shouldMixAudioTracks = false
+        return result
     }
 
     /// Cancels the current writing session
@@ -750,6 +769,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             audioInput = nil
             microphoneInput = nil
             outputURL = nil
+            shouldMixAudioTracks = false
 
             logger.info("AssetWriter cancelled")
         }
