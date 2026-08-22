@@ -24,7 +24,7 @@ playground.xcworkspace
 # Swift Package Manager
 #
 # Add this line if you want to avoid committing the cached source files of Swift Package Manager dependencies.
-# .build/
+.build/
 
 # CocoaPods
 #
