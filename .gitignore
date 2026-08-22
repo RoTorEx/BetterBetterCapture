@@ -98,3 +98,6 @@ Temporary Items
 
 # Snippets
 snippets/
+
+# Local kernel source path
+.vibe/KERNEL_SOURCE

@@ -61,6 +61,41 @@ Example:
 open "betterbettercapture://toggle"
 ```
 
+## Local development
+
+Recurring workflows use the repository Makefile and keep Xcode build state
+outside the checkout under `~/construction_side/better-better-capture/`:
+
+```bash
+make install
+make build
+make check
+```
+
+Project truth is routed through:
+
+- `BUSINESS.md` — purpose, concepts, invariants, numbers, and module map;
+- `business/PRODUCT.md` — recording, privacy, and automation behavior;
+- `business/ENGINEERING.md` — Swift, SwiftUI, testing, and build boundaries;
+- `business/OPERATIONS.md` — fork ownership, GitHub, and release behavior;
+- `AGENTS.md` — short context router for coding agents;
+- `CHANGELOG.md` — notable unreleased and released behavior.
+
+Refresh committed shared operating rules with `make vibe-pull`. If the kernel
+checkout moved, run `make vibe-kernel-set` first. Submit reusable agent-workflow
+feedback with `make vibe-propose`; keep product rules local.
+
+## Release flow
+
+After explicit release approval, run `make release` and enter the exact
+`MAJOR.MINOR.PATCH` version at its prompt. It verifies the project, updates Xcode
+marketing versions and `CHANGELOG.md`, creates the release commit, and adds the
+annotated tag without pushing.
+
+Run `make release-push` after review. This pushes only `origin/main` and tags.
+Publishing the corresponding GitHub Release is a separate explicit action; that
+publication triggers the signed, notarized DMG workflow.
+
 ## Contributing
 
 We welcome contributions of all kinds! Please see our [Contributing Guidelines](CONTRIBUTING.md) for more details on how to get involved.
