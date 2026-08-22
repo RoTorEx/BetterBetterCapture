@@ -9,3 +9,5 @@
   semantic-version equivalent of the latest stable `v2026.3` release line.
 - CI: stopped masking Xcode build/test failures and captured the pre-existing
   SwiftLint debt in a baseline so new violations fail verification immediately.
+- Tests: isolated recorder settings so repeated verification cannot leak
+  persisted audio-only state between test cases or runs.

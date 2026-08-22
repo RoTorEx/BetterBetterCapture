@@ -5,6 +5,7 @@
 //  Created by Joshua Sattler on 28.03.26.
 //
 
+import Foundation
 import Testing
 @testable import BetterBetterCapture
 
@@ -14,6 +15,17 @@ import Testing
 /// triggering any ScreenCaptureKit or system interactions.
 @MainActor
 struct RecorderViewModelTests {
+
+    private func withIsolatedViewModel(_ test: (RecorderViewModel) -> Void) {
+        let suiteName = "RecorderViewModelTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Could not create isolated user defaults")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        test(RecorderViewModel(settings: SettingsStore(defaults: defaults)))
+    }
 
     // MARK: - formattedDuration
 
@@ -30,8 +42,9 @@ struct RecorderViewModelTests {
     }
 
     @Test func cannotStartRecordingWithoutContentFilter() {
-        let viewModel = RecorderViewModel()
-        #expect(viewModel.canStartRecording == false)
+        withIsolatedViewModel { viewModel in
+            #expect(viewModel.canStartRecording == false)
+        }
     }
 
     @Test func hasNoContentSelectedByDefault() {
@@ -62,19 +75,21 @@ struct RecorderViewModelTests {
     // MARK: - Audio Only Recording
 
     @Test func canStartAudioOnlyRecordingWithoutContentFilter() {
-        let viewModel = RecorderViewModel()
-        viewModel.settings.recordAudioOnly = true
-        viewModel.settings.captureSystemAudio = true
+        withIsolatedViewModel { viewModel in
+            viewModel.settings.recordAudioOnly = true
+            viewModel.settings.captureSystemAudio = true
 
-        #expect(viewModel.canStartRecording == true)
+            #expect(viewModel.canStartRecording == true)
+        }
     }
 
     @Test func cannotStartAudioOnlyRecordingWithoutAudioSources() {
-        let viewModel = RecorderViewModel()
-        viewModel.settings.recordAudioOnly = true
-        viewModel.settings.captureSystemAudio = false
-        viewModel.settings.captureMicrophone = false
+        withIsolatedViewModel { viewModel in
+            viewModel.settings.recordAudioOnly = true
+            viewModel.settings.captureSystemAudio = false
+            viewModel.settings.captureMicrophone = false
 
-        #expect(viewModel.canStartRecording == false)
+            #expect(viewModel.canStartRecording == false)
+        }
     }
 }

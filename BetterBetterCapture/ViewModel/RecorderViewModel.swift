@@ -117,8 +117,12 @@ final class RecorderViewModel {
 
     // MARK: - Initialization
 
-    init() {
-        self.settings = SettingsStore()
+    convenience init() {
+        self.init(settings: SettingsStore())
+    }
+
+    init(settings: SettingsStore) {
+        self.settings = settings
         self.audioDeviceService = AudioDeviceService()
         self.cameraDeviceService = CameraDeviceService()
         self.previewService = PreviewService()
