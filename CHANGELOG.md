@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Build hygiene: moved Xcode DerivedData into a `.noindex` directory so local
+  debug app bundles do not appear in Spotlight.
 - App icon: replaced the legacy concentric-circle artwork with the film-reel
   mark used in the menu bar.
 - Operations: adopted Vibecoding Kernel 1.3.3, routed product and engineering

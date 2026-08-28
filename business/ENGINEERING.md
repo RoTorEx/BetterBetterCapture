@@ -50,7 +50,9 @@ When a model uses CloudKit:
 - `.swiftlint-baseline.json` records only violations that predate kernel
   adoption. Do not add new violations to the baseline as routine maintenance;
   remove entries when the underlying code is repaired.
-- Put Xcode DerivedData and cloned package state under
+- Put Xcode DerivedData under
+  `~/construction_side/better-better-capture/DerivedData.noindex` so debug app
+  bundles do not appear in Spotlight. Keep cloned package state under
   `~/construction_side/better-better-capture/`, never in the repository.
 - Put task-local temporary artifacts under the same construction-side directory
   and remove them when the task or command finishes.
