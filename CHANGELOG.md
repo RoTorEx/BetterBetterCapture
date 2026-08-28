@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- App icon: replaced the legacy concentric-circle artwork with the film-reel
+  mark used in the menu bar.
 - Operations: adopted Vibecoding Kernel 1.3.3, routed product and engineering
   rules into focused modules, added stable local verification/release commands,
   and moved Xcode build state under `~/construction_side/better-better-capture`.
