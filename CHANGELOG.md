@@ -2,8 +2,10 @@
 
 ## [Unreleased]
 
-- Local installation: added `make install-local` to install a Release build in
-  `~/Applications` and remove the confusing Spotlight-visible Debug product.
+- Local installation: added `make install-local` to install a verified,
+  Apple Development-signed Release build in `~/Applications`, preserving macOS
+  privacy permissions while removing the confusing Spotlight-visible Debug
+  product.
 - Build hygiene: moved Xcode DerivedData into a `.noindex` directory so local
   debug app bundles do not appear in Spotlight.
 - App icon: replaced the legacy concentric-circle artwork with the film-reel

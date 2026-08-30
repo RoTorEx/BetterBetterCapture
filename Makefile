@@ -20,10 +20,12 @@ XCODE_COMMON := \
 	-destination "$(DESTINATION)" \
 	-derivedDataPath "$(DERIVED_DATA_PATH)" \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES_PATH)" \
+	COMPILER_INDEX_STORE_ENABLE=NO
+
+XCODE_UNSIGNED := \
 	CODE_SIGN_IDENTITY="-" \
 	CODE_SIGNING_ALLOWED=NO \
-	CODE_SIGNING_REQUIRED=NO \
-	COMPILER_INDEX_STORE_ENABLE=NO
+	CODE_SIGNING_REQUIRED=NO
 
 .DEFAULT_GOAL := help
 
@@ -49,6 +51,8 @@ install:
 install-local:
 	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)" "$(LOCAL_APPLICATIONS_DIR)"
 	@$(XCODEBUILD) build $(XCODE_COMMON) -configuration Release -quiet
+	@codesign --verify --deep --strict "$(DERIVED_DATA_PATH)/Build/Products/Release/$(PROJECT_NAME).app"
+	@pkill -x "$(PROJECT_NAME)" >/dev/null 2>&1 || true
 	@rm -rf "$(LOCAL_APP_PATH)"
 	@ditto "$(DERIVED_DATA_PATH)/Build/Products/Release/$(PROJECT_NAME).app" "$(LOCAL_APP_PATH)"
 	@rm -rf "$(DERIVED_DATA_PATH)/Build/Products/Debug/$(PROJECT_NAME).app"
@@ -57,11 +61,11 @@ install-local:
 
 build:
 	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)"
-	@$(XCODEBUILD) build $(XCODE_COMMON) -configuration "$(CONFIGURATION)" -quiet
+	@$(XCODEBUILD) build $(XCODE_COMMON) $(XCODE_UNSIGNED) -configuration "$(CONFIGURATION)" -quiet
 
 test:
 	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)"
-	@$(XCODEBUILD) test $(XCODE_COMMON) -configuration Debug -quiet
+	@$(XCODEBUILD) test $(XCODE_COMMON) $(XCODE_UNSIGNED) -configuration Debug -quiet
 
 lint:
 	@command -v swiftlint >/dev/null 2>&1 || { echo "ERROR: SwiftLint is missing. Run: make install" >&2; exit 1; }
