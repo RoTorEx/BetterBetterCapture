@@ -23,3 +23,11 @@
 - Permission, capture, and save state must remain visible and truthful.
 - Avoid adding remote services or background infrastructure to local recording
   behavior without an explicit product decision.
+
+## Visual identity
+
+- The product mark combines an open screen bracket, a tall shared divider, and
+  two descending sound bars in one continuous visual system.
+- The application icon uses the white mark on a teal rounded square.
+- The menu-bar item uses the same geometry as a monochrome template image so it
+  remains legible across macOS appearances and highlighted states.
