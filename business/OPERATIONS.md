@@ -12,6 +12,9 @@
 - `make install` installs the required local lint tool.
 - `make build`, `make test`, `make lint`, and `make check` are the stable local
   interfaces.
+- `make install-local` builds a Release app, replaces the local copy at
+  `~/Applications/BetterBetterCapture.app`, and removes the disposable Debug
+  app bundle so Spotlight exposes the installed application instead.
 - `make vibe-pull` refreshes committed kernel instructions without rewriting
   project-owned rules or commands.
 - `make vibe-propose` is the only child-to-parent rule-feedback path.

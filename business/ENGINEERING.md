@@ -54,6 +54,9 @@ When a model uses CloudKit:
   `~/construction_side/better-better-capture/DerivedData.noindex` so debug app
   bundles do not appear in Spotlight. Keep cloned package state under
   `~/construction_side/better-better-capture/`, never in the repository.
+- For normal local use, run `make install-local`. It builds the Release
+  configuration into `~/Applications/BetterBetterCapture.app` and removes the
+  disposable Debug app bundle; do not direct users to launch the Debug product.
 - Put task-local temporary artifacts under the same construction-side directory
   and remove them when the task or command finishes.
 - Never commit secrets, signing material, provisioning profiles, or API keys.

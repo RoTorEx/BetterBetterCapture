@@ -10,6 +10,8 @@ PROJECT_CONSTRUCTION_SIDE ?= $(CONSTRUCTION_SIDE)/better-better-capture
 DERIVED_DATA_PATH ?= $(PROJECT_CONSTRUCTION_SIDE)/DerivedData.noindex
 SOURCE_PACKAGES_PATH ?= $(PROJECT_CONSTRUCTION_SIDE)/SourcePackages
 SWIFTLINT_CACHE_PATH ?= $(PROJECT_CONSTRUCTION_SIDE)/SwiftLintCache
+LOCAL_APPLICATIONS_DIR ?= $(HOME)/Applications
+LOCAL_APP_PATH := $(LOCAL_APPLICATIONS_DIR)/$(PROJECT_NAME).app
 XCODEBUILD ?= xcodebuild
 
 XCODE_COMMON := \
@@ -25,11 +27,12 @@ XCODE_COMMON := \
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install build test lint check release release-push vibe-kernel-path vibe-kernel-set vibe-pull
+.PHONY: help install install-local build test lint check release release-push vibe-kernel-path vibe-kernel-set vibe-pull
 
 help:
 	@printf "BetterBetterCapture commands:\n"
 	@printf "  make install\n"
+	@printf "  make install-local\n"
 	@printf "  make build\n"
 	@printf "  make test\n"
 	@printf "  make lint\n"
@@ -42,6 +45,15 @@ help:
 install:
 	@command -v brew >/dev/null 2>&1 || { echo "ERROR: Homebrew is required to install SwiftLint." >&2; exit 1; }
 	@command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+
+install-local:
+	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)" "$(LOCAL_APPLICATIONS_DIR)"
+	@$(XCODEBUILD) build $(XCODE_COMMON) -configuration Release -quiet
+	@rm -rf "$(LOCAL_APP_PATH)"
+	@ditto "$(DERIVED_DATA_PATH)/Build/Products/Release/$(PROJECT_NAME).app" "$(LOCAL_APP_PATH)"
+	@rm -rf "$(DERIVED_DATA_PATH)/Build/Products/Debug/$(PROJECT_NAME).app"
+	@touch "$(LOCAL_APP_PATH)"
+	@printf "Installed %s\n" "$(LOCAL_APP_PATH)"
 
 build:
 	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)"
