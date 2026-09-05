@@ -13,6 +13,7 @@ import SwiftUI
 struct BetterBetterCaptureApp: App {
     @State private var viewModel = RecorderViewModel()
     @State private var updaterService = UpdaterService()
+    @State private var shortcutsRegistered = false
     var body: some Scene {
         // Menu bar extra - the primary interface
         // Using .window style to support custom toggle switches
@@ -20,13 +21,15 @@ struct BetterBetterCaptureApp: App {
             MenuBarView(viewModel: viewModel)
                 .task {
                     await viewModel.requestPermissionsOnLaunch()
-                    registerKeyboardShortcuts()
                 }
                 .onOpenURL { url in
                     handleURL(url)
                 }
         } label: {
             MenuBarLabel(viewModel: viewModel)
+                .onAppear {
+                    registerKeyboardShortcuts()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -86,6 +89,15 @@ struct BetterBetterCaptureApp: App {
     // MARK: - Keyboard Shortcuts
 
     private func registerKeyboardShortcuts() {
+        guard !shortcutsRegistered else { return }
+        shortcutsRegistered = true
+
+        KeyboardShortcuts.onKeyUp(for: .toggleWindow) {
+            Task { @MainActor in
+                MenuBarWindowController.toggle()
+            }
+        }
+
         KeyboardShortcuts.onKeyUp(for: .toggleRecording) { [viewModel] in
             Task { @MainActor in
                 await viewModel.toggleRecording()

@@ -8,6 +8,7 @@
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
+    static let toggleWindow = Self("toggleWindow")
     static let toggleRecording = Self("toggleRecording")
     static let selectContent = Self("selectContent")
     static let selectArea = Self("selectArea")

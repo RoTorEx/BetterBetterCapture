@@ -19,6 +19,10 @@
 
 ## Interaction boundaries
 
+- Settings → Shortcuts includes a configurable global Toggle Window shortcut
+  that opens or closes the main menu-bar panel, including before its first manual
+  opening after launch. It has no default key combination and does not change
+  recording state.
 - Prefer native macOS and SwiftUI interaction patterns.
 - Permission, capture, and save state must remain visible and truthful.
 - Avoid adding remote services or background infrastructure to local recording

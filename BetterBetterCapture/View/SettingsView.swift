@@ -47,6 +47,10 @@ struct SettingsView: View {
 struct ShortcutsSettingsView: View {
     var body: some View {
         Form {
+            Section("Window") {
+                KeyboardShortcuts.Recorder("Toggle Window", name: .toggleWindow)
+            }
+
             Section("Recording") {
                 KeyboardShortcuts.Recorder("Toggle Recording", name: .toggleRecording)
             }

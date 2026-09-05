@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Shortcuts: added a configurable global Toggle Window action to show or hide
+  the menu-bar panel, with shortcut registration available from launch.
 - Visual identity: adopted the selected screen-and-sound mark for both the teal
   application icon and the adaptive monochrome menu-bar icon.
 - Local installation: added `make install-local` to install a verified,
