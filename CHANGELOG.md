@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Menu-bar panel: Escape now explicitly dismisses the panel without affecting
+  an active recording.
 - Shortcuts: added a configurable global Toggle Window action to show or hide
   the menu-bar panel, with shortcut registration available from launch.
 - Visual identity: adopted the selected screen-and-sound mark for both the teal

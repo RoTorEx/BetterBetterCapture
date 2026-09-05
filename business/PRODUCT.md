@@ -23,6 +23,8 @@
   that opens or closes the main menu-bar panel, including before its first manual
   opening after launch. It has no default key combination and does not change
   recording state.
+- Escape dismisses the main menu-bar panel, whether opened by clicking the
+  menu-bar icon or by the Toggle Window shortcut, without stopping a recording.
 - Prefer native macOS and SwiftUI interaction patterns.
 - Permission, capture, and save state must remain visible and truthful.
 - Avoid adding remote services or background infrastructure to local recording

@@ -1,4 +1,3 @@
-//
 //  MenuBarView.swift
 //  BetterBetterCapture
 //
@@ -201,6 +200,7 @@ struct MenuBarView: View {
         .frame(width: 320, height: menuHeight)
         .scrollDisabled(menuContentHeight <= maximumMenuHeight)
         .background(.ultraThinMaterial)
+        .onExitCommand { dismiss() }
         .animation(.easeInOut(duration: 0.25), value: viewModel.settings.recordAudioOnly)
     }
 }
