@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.3.2] - 2026-09-09
+
 - Menu-bar panel: added a quiet footer showing the installed app version.
 
 ## [2026.3.1] - 2026-09-09
