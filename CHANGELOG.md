@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.3.1] - 2026-09-09
+
 - Audio: replaced the noise-amplifying 0.75-second Auto gain calibration with
   default WebRTC voice processing (AEC3, noise suppression, AGC2), a Raw mode
   for fixed gain, lossless intermediates, one final encode, a -1 dBFS limiter,
