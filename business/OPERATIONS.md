@@ -24,6 +24,10 @@
 ## Release and publishing
 
 - Follow `.vibe/kernel/RELEASE.md` for release preparation and tag push.
+- Release versions follow the upstream calendar-year release line, not the
+  current day: `YEAR.LINE.PATCH`. `LINE` advances with the upstream release
+  train and `PATCH` advances for fixes on that line. For example, the August
+  2026 upstream pre-release is `2026.4`, so the middle component is not a month.
 - `make release` prompts for an exact `MAJOR.MINOR.PATCH`, verifies the project,
   updates Xcode marketing versions and `CHANGELOG.md`, creates the release commit,
   and adds an annotated tag. It does not push or publish.

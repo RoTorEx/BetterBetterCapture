@@ -33,6 +33,8 @@
   recording state.
 - Escape dismisses the main menu-bar panel, whether opened by clicking the
   menu-bar icon or by the Toggle Window shortcut, without stopping a recording.
+- The main menu-bar panel shows the installed marketing version as a quiet
+  footer; the full version and build identifier remain available in Settings.
 - Prefer native macOS and SwiftUI interaction patterns.
 - Permission, capture, and save state must remain visible and truthful.
 - Avoid adding remote services or background infrastructure to local recording

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Menu-bar panel: added a quiet footer showing the installed app version.
+
 ## [2026.3.1] - 2026-09-09
 
 - Audio: replaced the noise-amplifying 0.75-second Auto gain calibration with
