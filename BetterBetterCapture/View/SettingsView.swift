@@ -194,11 +194,11 @@ struct AudioSettingsView: View {
 
             Section("System Audio") {
                 Picker("Gain", selection: $settings.systemAudioGain) {
-                    ForEach(AudioGainMode.allCases) { gain in
+                    ForEach(AudioGainMode.allCases.filter { $0 != .auto }) { gain in
                         Text(gain.displayName).tag(gain)
                     }
                 }
-                .help("Auto automatically boosts quiet system audio to match the microphone")
+                .help("Optional fixed gain for system audio")
                 .disabled(!settings.captureSystemAudio)
             }
 
@@ -211,13 +211,21 @@ struct AudioSettingsView: View {
                 }
                 .disabled(!settings.captureMicrophone)
 
-                Picker("Gain", selection: $settings.microphoneGain) {
-                    ForEach(MicrophoneGain.allCases) { gain in
+                Picker("Processing", selection: $settings.microphoneProcessingMode) {
+                    ForEach(MicrophoneProcessingMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .help("Voice removes speaker echo and steady noise, then levels speech. Raw preserves the microphone signal.")
+                .disabled(!settings.captureMicrophone)
+
+                Picker("Raw gain", selection: $settings.microphoneGain) {
+                    ForEach(MicrophoneGain.allCases.filter { $0 != .auto }) { gain in
                         Text(gain.displayName).tag(gain)
                     }
                 }
-                .help("Auto automatically boosts a quiet microphone to match system audio")
-                .disabled(!settings.captureMicrophone)
+                .help("A fixed gain is available only in Raw mode")
+                .disabled(!settings.captureMicrophone || settings.microphoneProcessingMode == .voice)
             }
 
             Section("Format") {

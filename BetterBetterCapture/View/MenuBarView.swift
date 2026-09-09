@@ -17,6 +17,7 @@ struct MenuBarView: View {
     @State private var menuContentHeight: CGFloat = 320
 
     private var isRecording: Bool { viewModel.isRecording }
+    private var isBusy: Bool { isRecording || viewModel.isProcessing }
     private var maximumMenuHeight: CGFloat {
         let screen = NSScreen.screens.first { screen in
             screen.frame.contains(NSEvent.mouseLocation)
@@ -32,7 +33,7 @@ struct MenuBarView: View {
         ScrollView {
             VStack(spacing: 0) {
                 // Permission status banner (only when idle)
-                if !isRecording,
+                if !isBusy,
                    viewModel.permissionService.screenRecordingState != .granted ||
                     (viewModel.settings.captureMicrophone && viewModel.permissionService.microphoneState != .granted) {
                     PermissionStatusBanner(
@@ -44,7 +45,7 @@ struct MenuBarView: View {
 
                 // Warning when audio-only mode is active but microphone capture is off.
                 // Without this the user would record only the remote side of calls.
-                if !isRecording,
+                if !isBusy,
                    viewModel.settings.recordAudioOnly,
                    !viewModel.settings.captureMicrophone {
                     MicrophoneDisabledWarning()
@@ -52,7 +53,14 @@ struct MenuBarView: View {
                 }
 
                 // Recording button (stop) or Start button
-                if isRecording {
+                if viewModel.isProcessing {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Processing audio…", systemImage: "waveform.badge.magnifyingglass")
+                        ProgressView(value: viewModel.processingProgress)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                } else if isRecording {
                     MenuBarActionButton(
                         title: "Stop Recording",
                         systemImage: "stop.circle",
@@ -86,7 +94,7 @@ struct MenuBarView: View {
                     RecordingModeSelector(settings: viewModel.settings)
                         .padding(.horizontal, 12)
                         .padding(.top, 6)
-                        .disabled(isRecording)
+                        .disabled(isBusy)
                 }
 
                 // Content Selection (only relevant for screen + audio mode)
@@ -95,7 +103,7 @@ struct MenuBarView: View {
                         MenuBarDivider()
 
                         ContentSelectionButton(viewModel: viewModel) { dismiss() }
-                            .disabled(isRecording)
+                            .disabled(isBusy)
 
                         // Preview thumbnail (hidden in audio-only mode since the auto-selected display is not relevant)
                         if viewModel.hasContentSelected {
@@ -134,7 +142,7 @@ struct MenuBarView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 12)
-                            .disabled(isRecording)
+                            .disabled(isBusy)
                         }
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))

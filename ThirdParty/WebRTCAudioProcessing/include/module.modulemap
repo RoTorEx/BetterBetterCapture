@@ -1,0 +1,4 @@
+module WebRTCAudioProcessing {
+    header "WebRTCAudioProcessing.h"
+    export *
+}

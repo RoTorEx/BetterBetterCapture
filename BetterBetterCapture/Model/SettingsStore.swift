@@ -193,6 +193,15 @@ enum AudioGainMode: String, CaseIterable, Identifiable {
 // Backwards-compatible alias for the existing microphone-gain setting.
 typealias MicrophoneGain = AudioGainMode
 
+/// Voice uses WebRTC AEC3, noise suppression and AGC2 during finalization.
+/// Raw preserves the microphone signal apart from an optional fixed gain.
+enum MicrophoneProcessingMode: String, CaseIterable, Identifiable {
+    case voice = "Voice"
+    case raw = "Raw"
+
+    var id: String { rawValue }
+}
+
 /// Frame rate options for recording
 enum FrameRate: Int, CaseIterable, Identifiable {
     case native = 0
@@ -536,9 +545,31 @@ final class SettingsStore {
         }
     }
 
+    var microphoneProcessingMode: MicrophoneProcessingMode {
+        get {
+            access(keyPath: \.microphoneProcessingMode)
+            if let rawValue = defaults.string(forKey: "microphoneProcessingMode"),
+               let mode = MicrophoneProcessingMode(rawValue: rawValue) {
+                return mode
+            }
+            // The old Auto gain was intended as voice enhancement. Preserve that
+            // intent while moving fixed/off gain users to the unprocessed path.
+            return microphoneGainRaw == MicrophoneGain.auto.rawValue ? .voice : .raw
+        }
+        set {
+            withMutation(keyPath: \.microphoneProcessingMode) {
+                defaults.set(newValue.rawValue, forKey: "microphoneProcessingMode")
+            }
+            if newValue == .voice {
+                microphoneGain = .off
+            }
+        }
+    }
+
     var systemAudioGain: AudioGainMode {
         get {
-            AudioGainMode(rawValue: systemAudioGainRaw) ?? .off
+            let mode = AudioGainMode(rawValue: systemAudioGainRaw) ?? .off
+            return mode == .auto ? .off : mode
         }
         set {
             systemAudioGainRaw = newValue.rawValue

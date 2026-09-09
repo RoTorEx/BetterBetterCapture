@@ -47,6 +47,25 @@ struct AssetWriterTests {
         #expect(videoTracks.isEmpty)
     }
 
+    @Test func microphoneOnlyRecordingStartsAWriterSession() async throws {
+        let settings = makeStore()
+        settings.recordAudioOnly = true
+        settings.captureSystemAudio = false
+        settings.captureMicrophone = true
+        settings.microphoneProcessingMode = .raw
+
+        let assetWriter = AssetWriter()
+        try assetWriter.setup(url: makeOutputURL(), settings: settings, videoSize: videoSize)
+        try assetWriter.startWriting()
+        for index in 0..<10 {
+            let time = CMTime(value: CMTimeValue(index * 1024), timescale: 48_000)
+            assetWriter.appendMicrophoneSample(try makeSilentAudioSampleBuffer(at: time))
+        }
+        let result = try await assetWriter.finishWriting()
+        defer { try? FileManager.default.removeItem(at: result.url) }
+        #expect(FileManager.default.fileExists(atPath: result.url.path()))
+    }
+
     @Test func recordAudioOnlySettingProducesNoVideoTrack() async throws {
         let settings = makeStore()
         settings.recordAudioOnly = true

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Audio: replaced the noise-amplifying 0.75-second Auto gain calibration with
+  default WebRTC voice processing (AEC3, noise suppression, AGC2), a Raw mode
+  for fixed gain, lossless intermediates, one final encode, a -1 dBFS limiter,
+  processing progress, and recoverable failed finalization.
+- Audio-only capture: added a 2x2, 1 fps discard screen consumer to prevent the
+  ScreenCaptureKit missing-output error loop.
+
 - Menu-bar panel: Escape now explicitly dismisses the panel without affecting
   an active recording.
 - Shortcuts: added a configurable global Toggle Window action to show or hide

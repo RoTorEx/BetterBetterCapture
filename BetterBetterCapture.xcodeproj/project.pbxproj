@@ -375,9 +375,17 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/ThirdParty/WebRTCAudioProcessing/lib";
 				MARKETING_VERSION = 2026.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.betterbettercapture.app;
 				PRODUCT_NAME = BetterBetterCapture;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lWebRTCAudioProcessing",
+					"-lc++",
+					"-framework",
+					CoreFoundation,
+				);
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -385,6 +393,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/ThirdParty/WebRTCAudioProcessing/include";
 			};
 			name = Debug;
 		};
@@ -413,9 +422,17 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/ThirdParty/WebRTCAudioProcessing/lib";
 				MARKETING_VERSION = 2026.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.betterbettercapture.app;
 				PRODUCT_NAME = BetterBetterCapture;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lWebRTCAudioProcessing",
+					"-lc++",
+					"-framework",
+					CoreFoundation,
+				);
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -423,6 +440,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/ThirdParty/WebRTCAudioProcessing/include";
 			};
 			name = Release;
 		};
@@ -443,6 +461,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/ThirdParty/WebRTCAudioProcessing/include";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BetterBetterCapture.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BetterBetterCapture";
 			};
 			name = Debug;
@@ -464,6 +483,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/ThirdParty/WebRTCAudioProcessing/include";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BetterBetterCapture.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BetterBetterCapture";
 			};
 			name = Release;

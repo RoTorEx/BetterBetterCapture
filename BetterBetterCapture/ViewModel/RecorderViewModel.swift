@@ -17,10 +17,10 @@ final class RecorderViewModel {
 
     // MARK: - Recording State
 
-    enum RecordingState {
+    enum RecordingState: Equatable {
         case idle
         case recording
-        case stopping
+        case stopping, processing(Double)
     }
 
     // MARK: - Published Properties
@@ -362,7 +362,10 @@ final class RecorderViewModel {
             audioLevelMonitor.resetLevels()
 
             // Finalize file
-            let (outputURL, videoFrameCount) = try await assetWriter.finishWriting()
+            state = .processing(0)
+            let (outputURL, videoFrameCount) = try await assetWriter.finishWriting { [self] progress in
+                Task { @MainActor [self] in self.state = .processing(progress) }
+            }
 
             state = .idle
             recordingDuration = 0
@@ -552,6 +555,18 @@ extension RecorderViewModel: CaptureEngineDelegate {
             await previewService.cancelCapture()
             previewService.clearPreview()
         }
+    }
+}
+
+extension RecorderViewModel {
+    var isProcessing: Bool {
+        if case .processing = state { return true }
+        return false
+    }
+
+    var processingProgress: Double {
+        if case .processing(let progress) = state { return progress }
+        return 0
     }
 }
 

@@ -6,6 +6,14 @@
 - ProRes 422/4444, HEVC/H.265, and H.264 encoding, including supported alpha and
   HDR workflows.
 - Simultaneous system-audio and microphone capture.
+- Voice microphone processing is the default: system audio is used as the
+  far-end reference for WebRTC AEC3, followed by noise suppression and AGC2.
+  Raw mode bypasses voice processing and permits a fixed gain.
+- Capture audio is held in a lossless intermediate and encoded once at stop.
+  Final output contains one mixed audio track; video is remuxed without a
+  second encode. A failed processing pass preserves an `unprocessed.mov` file.
+- Real-time audio writer backpressure uses a bounded FIFO. Overflow or a flush
+  timeout fails explicitly instead of silently producing a recording with gaps.
 - Explicit content exclusion and local-only recording storage.
 - No tracking or analytics.
 

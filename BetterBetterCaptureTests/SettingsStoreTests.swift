@@ -74,6 +74,25 @@ struct SettingsStoreTests {
         #expect(store.recordAudioOnly == false)
     }
 
+    @Test func legacyAutoMicrophoneGainMigratesToVoiceProcessing() {
+        let store = makeStore()
+        #expect(store.microphoneGain == .auto)
+        #expect(store.microphoneProcessingMode == .voice)
+    }
+
+    @Test func legacyFixedMicrophoneGainMigratesToRawProcessing() {
+        let store = makeStore()
+        store.microphoneGain = .boost10
+        #expect(store.microphoneProcessingMode == .raw)
+    }
+
+    @Test func selectingVoiceProcessingDisablesLegacyGain() {
+        let store = makeStore()
+        store.microphoneGain = .boost20
+        store.microphoneProcessingMode = .voice
+        #expect(store.microphoneGain == .off)
+    }
+
     @Test func defaultShowCursorIsTrue() {
         let store = makeStore()
         #expect(store.showCursor == true)

@@ -270,12 +270,22 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var audioInput: AVAssetWriterInput?
     private var microphoneInput: AVAssetWriterInput?
-    private var shouldMixAudioTracks = false
+    private var shouldPostProcessAudio = false
     private var activeAudioCodec: AudioCodec = .aac
     private var activeAudioBitrate: AudioBitrate = .standard
+    private var activeHasSystemAudio = false
+    private var activeHasMicrophone = false
+    private var activeMicrophoneMode: MicrophoneProcessingMode = .voice
+    private var activeMicrophoneGain: MicrophoneGain = .off
+    private var activeSystemGain: AudioGainMode = .off
+    private var droppedAudioBufferCount = 0
+    private var systemAudioQueue: [CMSampleBuffer] = []
+    private var microphoneQueue: [CMSampleBuffer] = []
+    private let maximumQueuedAudioBuffers = 192
 
     private(set) var isWriting = false
     private(set) var outputURL: URL?
+    private var finalOutputURL: URL?
 
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture", category: "AssetWriter")
@@ -330,12 +340,16 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
         // Create asset writer. Audio-only recordings use audio-focused file types.
         let fileType: AVFileType
-        if settings.recordAudioOnly {
+        if settings.captureSystemAudio || settings.captureMicrophone {
+            fileType = .mov
+        } else if settings.recordAudioOnly {
             fileType = settings.audioCodec == .aac ? .mp4 : .wav
         } else {
             fileType = settings.containerFormat == .mov ? .mov : .mp4
         }
-        assetWriter = try AVAssetWriter(outputURL: url, fileType: fileType)
+        let captureURL = directory.appending(path: ".\(UUID().uuidString)-capture.\(url.pathExtension)")
+        try? FileManager.default.removeItem(at: captureURL)
+        assetWriter = try AVAssetWriter(outputURL: captureURL, fileType: fileType)
 
         guard let assetWriter else {
             throw AssetWriterError.failedToCreateWriter
@@ -396,19 +410,26 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             && (settings.videoCodec == .proRes422 || settings.videoCodec == .proRes4444)
         tagBuffersWithHDRColorimetry = isProResHDR
 
-        outputURL = url
+        outputURL = captureURL
+        finalOutputURL = url
         hasStartedSession = false
         sessionStartTime = .zero
         lastVideoPresentationTime = .invalid
         frameCount = 0
 
-        systemAudioGainState.reset(mode: settings.systemAudioGain)
-        microphoneGainState.reset(mode: settings.microphoneGain)
-        shouldMixAudioTracks = settings.recordAudioOnly
-            && settings.captureSystemAudio
-            && settings.captureMicrophone
+        systemAudioGainState.reset(mode: .off)
+        microphoneGainState.reset(mode: .off)
+        shouldPostProcessAudio = settings.captureSystemAudio || settings.captureMicrophone
         activeAudioCodec = settings.audioCodec
         activeAudioBitrate = settings.audioBitrate
+        activeHasSystemAudio = settings.captureSystemAudio
+        activeHasMicrophone = settings.captureMicrophone
+        activeMicrophoneMode = settings.microphoneProcessingMode
+        activeMicrophoneGain = settings.microphoneGain
+        activeSystemGain = settings.systemAudioGain
+        droppedAudioBufferCount = 0
+        systemAudioQueue.removeAll(keepingCapacity: true)
+        microphoneQueue.removeAll(keepingCapacity: true)
 
         logger.info(
             """
@@ -527,53 +548,62 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     /// Appends a system audio sample buffer - called synchronously from capture queue
     func appendAudioSample(_ sampleBuffer: CMSampleBuffer) {
         lock.withLockUnchecked {
-            guard let assetWriter,
-                assetWriter.status == .writing,
-                let audioInput,
-                audioInput.isReadyForMoreMediaData
-            else {
+            guard let assetWriter, assetWriter.status == .writing, let audioInput else {
                 return
             }
-
-            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-
-            // Start session on first sample if video hasn't started it yet
-            if !hasStartedSession {
-                assetWriter.startSession(atSourceTime: presentationTime)
-                sessionStartTime = presentationTime
-                hasStartedSession = true
-                logger.info("Session started at time: \(presentationTime.seconds)")
-            }
-
             let processedBuffer = systemAudioGainState.process(sampleBuffer) ?? sampleBuffer
-
             audioLevelMonitor?.processSystemAudioSample(processedBuffer)
-
-            if !audioInput.append(processedBuffer) {
-                logger.error("Failed to append audio sample buffer")
+            startSessionIfNeeded(assetWriter: assetWriter, sampleBuffer: processedBuffer)
+            guard systemAudioQueue.count < maximumQueuedAudioBuffers else {
+                droppedAudioBufferCount += 1
+                logger.error("System audio FIFO overflow")
+                return
             }
+            systemAudioQueue.append(processedBuffer)
+            droppedAudioBufferCount += Self.drainAudioQueue(&systemAudioQueue, into: audioInput)
         }
     }
 
     /// Appends a microphone audio sample buffer, applying the configured gain.
     func appendMicrophoneSample(_ sampleBuffer: CMSampleBuffer) {
         lock.withLockUnchecked {
-            guard let assetWriter,
-                assetWriter.status == .writing,
-                let microphoneInput,
-                microphoneInput.isReadyForMoreMediaData
-            else {
+            guard let assetWriter, assetWriter.status == .writing, let microphoneInput else {
                 return
             }
-
             let processedBuffer = microphoneGainState.process(sampleBuffer) ?? sampleBuffer
-
             audioLevelMonitor?.processMicrophoneSample(processedBuffer)
-
-            if !microphoneInput.append(processedBuffer) {
-                logger.error("Failed to append microphone sample buffer")
+            startSessionIfNeeded(assetWriter: assetWriter, sampleBuffer: processedBuffer)
+            guard microphoneQueue.count < maximumQueuedAudioBuffers else {
+                droppedAudioBufferCount += 1
+                logger.error("Microphone FIFO overflow")
+                return
             }
+            microphoneQueue.append(processedBuffer)
+            droppedAudioBufferCount += Self.drainAudioQueue(&microphoneQueue, into: microphoneInput)
         }
+    }
+
+    private func startSessionIfNeeded(assetWriter: AVAssetWriter, sampleBuffer: CMSampleBuffer) {
+        guard !hasStartedSession else { return }
+        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        assetWriter.startSession(atSourceTime: presentationTime)
+        sessionStartTime = presentationTime
+        hasStartedSession = true
+        logger.info("Session started at time: \(presentationTime.seconds)")
+    }
+
+    private static func drainAudioQueue(
+        _ queue: inout [CMSampleBuffer], into input: AVAssetWriterInput
+    ) -> Int {
+        while input.isReadyForMoreMediaData, let sample = queue.first {
+            guard input.append(sample) else {
+                let dropped = queue.count
+                queue.removeAll(keepingCapacity: true)
+                return dropped
+            }
+            queue.removeFirst()
+        }
+        return 0
     }
 
     // MARK: - Audio Gain Helpers
@@ -660,7 +690,10 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     /// - Returns: The output URL and the number of video frames written. A count of zero
     ///            means the file holds audio only, which happens when the capture source
     ///            stopped producing frames while audio kept flowing.
-    func finishWriting() async throws -> (url: URL, videoFrameCount: Int) {
+    func finishWriting(
+        progress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> (url: URL, videoFrameCount: Int) {
+        await flushAudioQueues()
         // First critical section: validate state and mark inputs as finished
         let (writerToFinish, url): (AVAssetWriter, URL)
 
@@ -700,51 +733,33 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         // Finish writing (outside lock since it's async)
         await writerToFinish.finishWriting()
 
-        // Second critical section: check final status and cleanup
-        let result: (url: URL, videoFrameCount: Int) = try lock.withLockUnchecked {
-            guard let assetWriter else {
-                throw AssetWriterError.writerNotReady
+        let result = try completeWriter(url: url)
+
+        return try await finishProcessing(result: result, progress: progress)
+    }
+
+    private func flushAudioQueues() async {
+        let deadline = ContinuousClock.now + .seconds(2)
+        while ContinuousClock.now < deadline {
+            let finished = lock.withLockUnchecked {
+                if let audioInput {
+                    droppedAudioBufferCount += Self.drainAudioQueue(
+                        &systemAudioQueue, into: audioInput)
+                }
+                if let microphoneInput {
+                    droppedAudioBufferCount += Self.drainAudioQueue(
+                        &microphoneQueue, into: microphoneInput)
+                }
+                return systemAudioQueue.isEmpty && microphoneQueue.isEmpty
             }
-
-            if assetWriter.status == .failed {
-                let error = assetWriter.error
-                logger.error(
-                    "AssetWriter failed: \(error?.localizedDescription ?? "unknown error")")
-                throw AssetWriterError.writingFailed(error)
-            }
-
-            isWriting = false
-            hasStartedSession = false
-            lastVideoPresentationTime = .invalid
-            activeHDRPreset = .sdr
-            tagBuffersWithHDRColorimetry = false
-
-            logger.info(
-                "AssetWriter finished writing \(self.frameCount) frames to: \(url.lastPathComponent)"
-            )
-            let videoFrameCount = frameCount
-            frameCount = 0
-
-            self.assetWriter = nil
-            self.videoInput = nil
-            self.pixelBufferAdaptor = nil
-            self.audioInput = nil
-            self.microphoneInput = nil
-            self.outputURL = nil
-
-            return (url, videoFrameCount)
+            if finished { return }
+            try? await Task.sleep(for: .milliseconds(2))
         }
-
-        if shouldMixAudioTracks {
-            try await AudioTrackMixer.mixTracks(
-                in: result.url,
-                codec: activeAudioCodec,
-                bitrate: activeAudioBitrate
-            )
+        lock.withLockUnchecked {
+            droppedAudioBufferCount += systemAudioQueue.count + microphoneQueue.count
+            systemAudioQueue.removeAll(keepingCapacity: true)
+            microphoneQueue.removeAll(keepingCapacity: true)
         }
-
-        shouldMixAudioTracks = false
-        return result
     }
 
     /// Cancels the current writing session
@@ -769,7 +784,10 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             audioInput = nil
             microphoneInput = nil
             outputURL = nil
-            shouldMixAudioTracks = false
+            finalOutputURL = nil
+            shouldPostProcessAudio = false
+            systemAudioQueue.removeAll(keepingCapacity: true)
+            microphoneQueue.removeAll(keepingCapacity: true)
 
             logger.info("AssetWriter cancelled")
         }
@@ -901,32 +919,96 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     }
 
     private func createAudioSettings(from settings: SettingsStore) -> [String: Any] {
-        switch settings.audioCodec {
-        case .aac:
-            return [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 48000,
-                AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: settings.audioBitrate.rawValue
-            ]
-
-        case .pcm:
-            return [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: 48000,
-                AVNumberOfChannelsKey: 2,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false
-            ]
-        }
+        [AVFormatIDKey: kAudioFormatAppleLossless, AVSampleRateKey: 48_000,
+         AVNumberOfChannelsKey: 2, AVEncoderBitDepthHintKey: 24]
     }
 }
 
 // MARK: - CaptureEngineSampleBufferDelegate
 
 extension AssetWriter {
+
+    private func completeWriter(url: URL) throws -> (url: URL, videoFrameCount: Int) {
+        try lock.withLockUnchecked {
+            guard let assetWriter else { throw AssetWriterError.writerNotReady }
+            if assetWriter.status == .failed {
+                let error = assetWriter.error
+                logger.error("AssetWriter failed: \(error?.localizedDescription ?? "unknown error")")
+                throw AssetWriterError.writingFailed(error)
+            }
+            isWriting = false
+            hasStartedSession = false
+            lastVideoPresentationTime = .invalid
+            activeHDRPreset = .sdr
+            tagBuffersWithHDRColorimetry = false
+            logger.info("AssetWriter finished writing \(self.frameCount) frames to: \(url.lastPathComponent)")
+            let videoFrameCount = frameCount
+            frameCount = 0
+            self.assetWriter = nil
+            videoInput = nil
+            pixelBufferAdaptor = nil
+            audioInput = nil
+            microphoneInput = nil
+            outputURL = nil
+            return (url, videoFrameCount)
+        }
+    }
+
+    private func finishProcessing(
+        result: (url: URL, videoFrameCount: Int),
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> (url: URL, videoFrameCount: Int) {
+        guard let finalURL = finalOutputURL else { throw AssetWriterError.noOutputURL }
+        if droppedAudioBufferCount > 0 {
+            let recoveryURL = makeRecoveryURL(for: finalURL)
+            try? FileManager.default.moveItem(at: result.url, to: recoveryURL)
+            finalOutputURL = nil
+            throw AssetWriterError.audioBuffersDropped(droppedAudioBufferCount)
+        }
+        let audioTracks = try await AVURLAsset(url: result.url).loadTracks(withMediaType: .audio)
+        if shouldPostProcessAudio && !audioTracks.isEmpty {
+            do {
+                let report = try await AudioTrackMixer.mixTracks(
+                    in: result.url,
+                    configuration: AudioMixConfiguration(
+                        codec: activeAudioCodec, bitrate: activeAudioBitrate,
+                        hasSystemAudio: activeHasSystemAudio,
+                        hasMicrophone: activeHasMicrophone,
+                        microphoneMode: activeMicrophoneMode,
+                        microphoneGain: activeMicrophoneGain,
+                        systemGain: activeSystemGain),
+                    progress: progress)
+                logger.info("Audio processed with peak \(report.peakDBFS)dBFS")
+                logger.info("AEC ERLE: \(String(describing: report.echoReturnLossEnhancementDB))")
+                logger.info("AEC residual echo: \(String(describing: report.residualEchoLikelihood))")
+                logger.info("AEC delay: \(String(describing: report.estimatedDelayMS))ms")
+            } catch {
+                let recoveryURL = makeRecoveryURL(for: finalURL)
+                if !FileManager.default.fileExists(atPath: recoveryURL.path) {
+                    try? FileManager.default.moveItem(at: result.url, to: recoveryURL)
+                }
+                logger.error("Audio processing failed; recoverable capture: \(recoveryURL.lastPathComponent)")
+                throw error
+            }
+        }
+        shouldPostProcessAudio = false
+        if FileManager.default.fileExists(atPath: finalURL.path) {
+            _ = try FileManager.default.replaceItemAt(finalURL, withItemAt: result.url)
+        } else {
+            try FileManager.default.moveItem(at: result.url, to: finalURL)
+        }
+        finalOutputURL = nil
+        return (finalURL, result.videoFrameCount)
+    }
+
+    private func makeRecoveryURL(for finalURL: URL) -> URL {
+        let preferred = finalURL.deletingLastPathComponent().appending(
+            path: finalURL.deletingPathExtension().lastPathComponent + "-unprocessed.mov")
+        guard FileManager.default.fileExists(atPath: preferred.path) else { return preferred }
+        return finalURL.deletingLastPathComponent().appending(
+            path: finalURL.deletingPathExtension().lastPathComponent
+                + "-unprocessed-\(UUID().uuidString).mov")
+    }
 
     func captureEngine(
         _ engine: CaptureEngine, didOutputVideoSampleBuffer sampleBuffer: CMSampleBuffer
@@ -980,7 +1062,7 @@ final class AudioLevelMonitor {
         }
     }
 
-    private nonisolated static func smooth(current: CGFloat, target: CGFloat) -> CGFloat {
+    nonisolated private static func smooth(current: CGFloat, target: CGFloat) -> CGFloat {
         let attack: CGFloat = 0.6
         let decay: CGFloat = 0.8
 
@@ -991,7 +1073,7 @@ final class AudioLevelMonitor {
         }
     }
 
-    private nonisolated static func computeLevel(from sampleBuffer: CMSampleBuffer) -> CGFloat {
+    nonisolated private static func computeLevel(from sampleBuffer: CMSampleBuffer) -> CGFloat {
         guard let statistics = AudioSampleBufferProcessor.statistics(from: sampleBuffer),
               statistics.sampleCount > 0 else {
             return 0
@@ -1013,7 +1095,7 @@ final class AudioLevelMonitor {
 
     /// Converts an RMS value to a perceptual 0...1 level using a dB scale with a noise floor.
     /// Uses a -40 dB floor and a square-root curve so low-level noise is visually suppressed.
-    private nonisolated static func levelFromDecibels(rms: Double) -> Double {
+    nonisolated private static func levelFromDecibels(rms: Double) -> Double {
         let minDb: Double = -40
         let maxDb: Double = 0
 
@@ -1039,7 +1121,7 @@ final class AudioLevelMonitor {
         defaultDeviceName(selector: kAudioHardwarePropertyDefaultInputDevice, fallback: "System Microphone")
     }
 
-    private nonisolated static func defaultDeviceName(selector: AudioObjectPropertySelector, fallback: String) -> String {
+    nonisolated private static func defaultDeviceName(selector: AudioObjectPropertySelector, fallback: String) -> String {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: selector,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -1101,7 +1183,7 @@ final class AudioLevelMonitor {
         defaultDeviceVolume(selector: kAudioHardwarePropertyDefaultInputDevice, scope: kAudioObjectPropertyScopeInput)
     }
 
-    private nonisolated static func defaultDeviceVolume(selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope) -> Float? {
+    nonisolated private static func defaultDeviceVolume(selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope) -> Float? {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: selector,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -1154,6 +1236,7 @@ enum AssetWriterError: LocalizedError {
     case writingFailed(Error?)
     case noOutputURL
     case noFramesWritten
+    case audioBuffersDropped(Int)
 
     var errorDescription: String? {
         switch self {
@@ -1169,6 +1252,8 @@ enum AssetWriterError: LocalizedError {
             return "No output URL was configured."
         case .noFramesWritten:
             return "No video frames were captured. Check screen recording permissions."
+        case .audioBuffersDropped(let count):
+            return "Audio capture could not keep up and dropped \(count) buffers; the partial lossless recording was preserved."
         }
     }
 }

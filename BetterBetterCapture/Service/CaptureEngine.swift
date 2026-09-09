@@ -49,8 +49,10 @@ final class CaptureEngine: NSObject {
 
     // Queues for sample buffer handling
     private let videoSampleQueue = DispatchQueue(label: "com.bettercapture.videoSampleQueue", qos: .userInteractive)
+    private let discardVideoSampleQueue = DispatchQueue(label: "com.bettercapture.discardVideoSampleQueue", qos: .utility)
     private let audioSampleQueue = DispatchQueue(label: "com.bettercapture.audioSampleQueue", qos: .userInteractive)
     private let microphoneSampleQueue = DispatchQueue(label: "com.bettercapture.microphoneSampleQueue", qos: .userInteractive)
+    nonisolated(unsafe) private var discardScreenSamples = false
 
     // MARK: - Initialization
 
@@ -145,10 +147,10 @@ final class CaptureEngine: NSObject {
             throw CaptureError.failedToCreateStream
         }
 
-        if !settings.recordAudioOnly {
-            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: videoSampleQueue)
-            logger.info("Added screen output")
-        }
+        // ScreenCaptureKit expects a screen consumer even for audio-only streams.
+        // A tiny, low-rate discard output avoids the continuous internal
+        // "stream output NOT found" error loop without encoding video.
+        try addScreenOutput(to: stream, audioOnly: settings.recordAudioOnly)
 
         if settings.captureSystemAudio {
             try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioSampleQueue)
@@ -167,6 +169,19 @@ final class CaptureEngine: NSObject {
         isCapturing = true
 
         logger.info("Capture started successfully")
+    }
+
+    private func addScreenOutput(to stream: SCStream, audioOnly: Bool) throws {
+        discardScreenSamples = audioOnly
+        try stream.addStreamOutput(
+            self,
+            type: .screen,
+            sampleHandlerQueue: audioOnly ? discardVideoSampleQueue : videoSampleQueue)
+        if audioOnly {
+            logger.info("Added audio-only discard screen output")
+        } else {
+            logger.info("Added screen output")
+        }
     }
 
     /// Stops the current capture stream
@@ -230,9 +245,8 @@ final class CaptureEngine: NSObject {
             config.captureDynamicRange = .SDR
         }
 
-        // Set output dimensions - required for proper capture
-        config.width = Int(contentSize.width)
-        config.height = Int(contentSize.height)
+        config.width = settings.recordAudioOnly ? 2 : Int(contentSize.width)
+        config.height = settings.recordAudioOnly ? 2 : Int(contentSize.height)
 
         // Set source rect for area selection (only works with display captures)
         if let sourceRect {
@@ -241,7 +255,10 @@ final class CaptureEngine: NSObject {
         }
 
         // Frame rate - native uses display sync (1/120 timescale)
-        if settings.frameRate == .native {
+        if settings.recordAudioOnly {
+            config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
+            config.queueDepth = 1
+        } else if settings.frameRate == .native {
             config.minimumFrameInterval = CMTime(value: 1, timescale: 120)
         } else {
             config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(settings.frameRate.rawValue))
@@ -361,7 +378,9 @@ extension CaptureEngine: SCStreamOutput {
         // to ensure the buffer remains valid during processing
         switch type {
         case .screen:
-            sampleBufferDelegate?.captureEngine(self, didOutputVideoSampleBuffer: sampleBuffer)
+            if !discardScreenSamples {
+                sampleBufferDelegate?.captureEngine(self, didOutputVideoSampleBuffer: sampleBuffer)
+            }
         case .audio:
             sampleBufferDelegate?.captureEngine(self, didOutputAudioSampleBuffer: sampleBuffer)
         case .microphone:
