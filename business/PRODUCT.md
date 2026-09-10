@@ -35,6 +35,9 @@
   menu-bar icon or by the Toggle Window shortcut, without stopping a recording.
 - The main menu-bar panel shows the installed marketing version as a quiet
   footer; the full version and build identifier remain available in Settings.
+- While audio is being finalized, the main menu-bar panel keeps Start Recording
+  visible but disabled and shows truthful progress. The action becomes available
+  again only after the output file is ready.
 - Prefer native macOS and SwiftUI interaction patterns.
 - Permission, capture, and save state must remain visible and truthful.
 - Avoid adding remote services or background infrastructure to local recording

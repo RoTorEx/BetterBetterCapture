@@ -57,9 +57,19 @@ struct MenuBarView: View {
 
                 // Recording button (stop) or Start button
                 if viewModel.isProcessing {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("Processing audio…", systemImage: "waveform.badge.magnifyingglass")
-                        ProgressView(value: viewModel.processingProgress)
+                    VStack(alignment: .leading, spacing: 8) {
+                        MenuBarActionButton(
+                            title: "Start Recording",
+                            systemImage: "record.circle",
+                            accentColor: .green,
+                            isDisabled: true,
+                            isProminent: true
+                        ) {}
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Processing audio…", systemImage: "waveform.badge.magnifyingglass")
+                            ProgressView(value: viewModel.processingProgress)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)

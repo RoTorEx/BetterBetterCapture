@@ -63,16 +63,21 @@ struct AudioProcessingTests {
             asset: composition, presetName: AVAssetExportPresetPassthrough))
         try await exporter.export(to: sourceURL, as: .mov)
 
+        let recordedProgress = ProgressRecorder()
         _ = try await AudioTrackMixer.mixTracks(
             in: sourceURL,
             configuration: AudioMixConfiguration(
                 codec: .aac, bitrate: .standard, hasSystemAudio: true,
                 hasMicrophone: true, microphoneMode: .voice,
-                microphoneGain: .off, systemGain: .off))
+                microphoneGain: .off, systemGain: .off)
+        ) { recordedProgress.append($0) }
 
         let result = AVURLAsset(url: sourceURL)
         #expect(try await result.loadTracks(withMediaType: .audio).count == 1)
         #expect(try await result.load(.duration).seconds > 0.15)
+        let progress = recordedProgress.values
+        #expect(progress.last == 1)
+        #expect(progress.dropLast().allSatisfy { $0 <= 0.9 })
     }
 
     private func writeTone(to url: URL, frequency: Double) throws {
@@ -86,6 +91,19 @@ struct AudioProcessingTests {
             samples[index] = Float(sin(2 * .pi * frequency * Double(index) / 48_000) * 0.1)
         }
         try file.write(from: buffer)
+    }
+}
+
+private final class ProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedValues: [Double] = []
+
+    var values: [Double] {
+        lock.withLock { recordedValues }
+    }
+
+    func append(_ value: Double) {
+        lock.withLock { recordedValues.append(value) }
     }
 }
 

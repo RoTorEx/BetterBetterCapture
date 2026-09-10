@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Menu-bar panel: keep the primary recording button visible but disabled while
+  audio is processing, and reserve the end of the progress bar for file
+  finalization so it no longer appears stuck at 100%.
+
 ## [2026.3.2] - 2026-09-09
 
 - Menu-bar panel: added a quiet footer showing the installed app version.

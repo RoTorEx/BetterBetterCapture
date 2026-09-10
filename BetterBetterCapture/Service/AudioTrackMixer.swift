@@ -50,12 +50,19 @@ enum AudioTrackMixer {
         defer { if let apm { bbc_apm_destroy(apm) } }
 
         do {
-            let peak = try await render(RenderInput(
-                totalFrames: totalFrames, readers: readers, configuration: configuration,
-                format: format, output: output!, apm: apm), progress: progress)
+            let peak = try await render(
+                RenderInput(totalFrames: totalFrames, readers: readers, configuration: configuration,
+                            format: format, output: output!, apm: apm)
+            ) { renderProgress in
+                // Keep the final 10% for closing the encoded audio and installing it in
+                // the destination container. Reporting 100% before those operations made
+                // the menu look stuck even though finalization was still in progress.
+                progress?(renderProgress * 0.9)
+            }
             output = nil
             try await installProcessedAudio(processedURL, replacingAudioIn: sourceURL,
                 hasVideo: !(try await asset.loadTracks(withMediaType: .video)).isEmpty)
+            progress?(1)
             return makeReport(stats: apm.map { bbc_apm_metrics($0) }, peak: peak)
         } catch {
             try? FileManager.default.removeItem(at: processedURL)
