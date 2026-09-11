@@ -174,7 +174,7 @@ enum AudioGainMode: String, CaseIterable, Identifiable {
     var displayName: String { rawValue }
 
     /// Fixed linear multiplier for manual boost modes. Auto returns 1.0 (calculated dynamically).
-    var linearGain: Double {
+    nonisolated var linearGain: Double {
         switch self {
         case .auto:
             return 1.0

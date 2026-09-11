@@ -52,16 +52,7 @@ struct BetterBetterCaptureApp: App {
         switch url.host {
         case "toggle":
             Task { @MainActor in
-                if viewModel.isRecording {
-                    await viewModel.stopRecording()
-                } else {
-                    switch ContentSelectionMode.current {
-                    case .pickContent:
-                        viewModel.presentPicker()
-                    case .selectArea:
-                        await viewModel.presentAreaSelection()
-                    }
-                }
+                await viewModel.toggleRecording()
             }
         case "open-recordings":
             Task { @MainActor in

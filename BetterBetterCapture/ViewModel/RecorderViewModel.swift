@@ -17,12 +17,6 @@ final class RecorderViewModel {
 
     // MARK: - Recording State
 
-    enum RecordingState: Equatable {
-        case idle
-        case recording
-        case stopping, processing(Double)
-    }
-
     // MARK: - Published Properties
 
     private(set) var state: RecordingState = .idle
@@ -38,55 +32,6 @@ final class RecorderViewModel {
 
     /// The screen on which the area selection was made
     private var selectedScreen: NSScreen?
-
-    /// Whether the current selection is an area selection (as opposed to a picker selection)
-    var isAreaSelection: Bool {
-        selectedSourceRect != nil
-    }
-
-    var isRecording: Bool {
-        state == .recording
-    }
-
-    var canStartRecording: Bool {
-        guard state == .idle else { return false }
-
-        if settings.recordAudioOnly {
-            return settings.captureSystemAudio || settings.captureMicrophone
-        }
-
-        return selectedContentFilter != nil
-    }
-
-    var hasContentSelected: Bool {
-        selectedContentFilter != nil
-    }
-
-    var formattedDuration: String {
-        let hours = Int(recordingDuration) / 3600
-        let minutes = (Int(recordingDuration) % 3600) / 60
-        let seconds = Int(recordingDuration) % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%02d:%02d", minutes, seconds)
-        }
-    }
-
-    /// The name of the active system audio output device.
-    var systemAudioDeviceName: String {
-        AudioLevelMonitor.defaultOutputDeviceName()
-    }
-
-    /// The name of the active microphone input device. Falls back to the system's default input device name.
-    var microphoneDeviceName: String {
-        if let id = settings.selectedMicrophoneID,
-           let device = audioDeviceService.availableDevices.first(where: { $0.id == id }) {
-            return device.name
-        }
-        return AudioLevelMonitor.defaultInputDeviceName()
-    }
 
     /// Whether Presenter Overlay is currently active (camera composited into stream)
     private(set) var isPresenterOverlayActive = false
@@ -155,11 +100,12 @@ final class RecorderViewModel {
     /// Toggles the recording state. If no content is selected, triggers the appropriate
     /// selection flow based on the user's content selection mode preference.
     func toggleRecording() async {
-        if isRecording {
+        switch state.toggleAction {
+        case .stop:
             await stopRecording()
-        } else if hasContentSelected {
+        case .start where hasContentSelected:
             await startRecording()
-        } else {
+        case .start:
             // No content selected — trigger selection based on the user's preferred mode
             switch ContentSelectionMode.current {
             case .pickContent:
@@ -167,6 +113,8 @@ final class RecorderViewModel {
             case .selectArea:
                 await presentAreaSelection()
             }
+        case .none:
+            logger.info("Ignoring recording toggle while finalization is already in progress")
         }
     }
 
@@ -363,8 +311,8 @@ final class RecorderViewModel {
 
             // Finalize file
             state = .processing(0)
-            let (outputURL, videoFrameCount) = try await assetWriter.finishWriting { [self] progress in
-                Task { @MainActor [self] in self.state = .processing(progress) }
+            let (outputURL, videoFrameCount) = try await assetWriter.finishWriting { [weak self] progress in
+                await self?.updateProcessingProgress(progress)
             }
 
             state = .idle
@@ -395,6 +343,10 @@ final class RecorderViewModel {
             notificationService.sendRecordingFailedNotification(error: error)
             logger.error("Failed to stop recording: \(error.localizedDescription)")
         }
+    }
+
+    private func updateProcessingProgress(_ progress: Double) {
+        state = state.updatingProcessingProgress(progress)
     }
 
     /// Resets the capture selection, removing the border frame and clearing state
@@ -444,43 +396,6 @@ final class RecorderViewModel {
         recordingStartTime = nil
     }
 
-    // MARK: - Helper Methods
-
-    private func getContentSize(from filter: SCContentFilter) async -> CGSize {
-        // Apply scale if Capture Native Resolution setting is enabled
-        let applyScale: Bool = settings.captureNativeResolution
-
-        // If area selection is active, use the source rect dimensions.
-        // The sourceRect is already snapped to even pixel counts in presentAreaSelection().
-        if let sourceRect = selectedSourceRect {
-            let scale = CGFloat(filter.pointPixelScale)
-            return CGSize(
-                width: applyScale ? sourceRect.width * scale : sourceRect.width,
-                height: applyScale ? sourceRect.height * scale : sourceRect.height
-            )
-        }
-
-        // Get the content rect from the filter
-        let rect = filter.contentRect
-        let scale = CGFloat(filter.pointPixelScale)
-
-        if rect.width > 0 && rect.height > 0 {
-            return CGSize(
-                width: applyScale ? rect.width * scale : rect.width,
-                height: applyScale ? rect.height * scale : rect.height
-            )
-        }
-
-        // Fallback to main screen size
-        if let screen = NSScreen.main {
-            return CGSize(
-                width: applyScale ? screen.frame.width * screen.backingScaleFactor : screen.frame.width,
-                height: applyScale ? screen.frame.height * screen.backingScaleFactor : screen.frame.height
-            )
-        }
-
-        return CGSize(width: 1920, height: 1080)
-    }
 }
 
 // MARK: - CaptureEngineDelegate
@@ -555,18 +470,6 @@ extension RecorderViewModel: CaptureEngineDelegate {
             await previewService.cancelCapture()
             previewService.clearPreview()
         }
-    }
-}
-
-extension RecorderViewModel {
-    var isProcessing: Bool {
-        if case .processing = state { return true }
-        return false
-    }
-
-    var processingProgress: Double {
-        if case .processing(let progress) = state { return progress }
-        return 0
     }
 }
 

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Fixed a race where hundreds of thousands of queued audio-progress updates
+  could starve the main UI and leave the menu-bar panel permanently busy after
+  a recording had saved. Audio finalization now runs on a concurrent executor
+  and publishes at most about one hundred ordered progress updates.
+- Recording toggles are now ignored during stopping and processing, the Stop
+  action remains visible while shutdown is underway, and Quit is disabled while
+  a recording is active or being finalized.
+
 ## [2026.3.3] - 2026-09-10
 
 - Menu-bar panel: keep the primary recording button visible but disabled while

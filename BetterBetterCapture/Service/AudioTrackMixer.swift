@@ -2,14 +2,14 @@ import AVFoundation
 import Foundation
 import WebRTCAudioProcessing
 
-struct AudioProcessingReport: Sendable {
+nonisolated struct AudioProcessingReport: Sendable {
     let echoReturnLossEnhancementDB: Double?
     let residualEchoLikelihood: Double?
     let estimatedDelayMS: Int?
     let peakDBFS: Double
 }
 
-struct AudioMixConfiguration: Sendable {
+nonisolated struct AudioMixConfiguration: Sendable {
     let codec: AudioCodec
     let bitrate: AudioBitrate
     let hasSystemAudio: Bool
@@ -21,14 +21,14 @@ struct AudioMixConfiguration: Sendable {
 
 /// Converts capture tracks to one final track. Voice mode feeds system audio to
 /// WebRTC AEC3 as far-end and processes the microphone in 10 ms frames.
-enum AudioTrackMixer {
+nonisolated enum AudioTrackMixer {
     private static let sampleRate = 48_000.0
     private static let frameLength = 480
 
-    static func mixTracks(
+    @concurrent static func mixTracks(
         in sourceURL: URL,
         configuration: AudioMixConfiguration,
-        progress: (@Sendable (Double) -> Void)? = nil
+        progress: (@Sendable (Double) async -> Void)? = nil
     ) async throws -> AudioProcessingReport {
         let asset = AVURLAsset(url: sourceURL)
         let tracks = try await asset.loadTracks(withMediaType: .audio)
@@ -57,12 +57,12 @@ enum AudioTrackMixer {
                 // Keep the final 10% for closing the encoded audio and installing it in
                 // the destination container. Reporting 100% before those operations made
                 // the menu look stuck even though finalization was still in progress.
-                progress?(renderProgress * 0.9)
+                await progress?(renderProgress * 0.9)
             }
             output = nil
             try await installProcessedAudio(processedURL, replacingAudioIn: sourceURL,
                 hasVideo: !(try await asset.loadTracks(withMediaType: .video)).isEmpty)
-            progress?(1)
+            await progress?(1)
             return makeReport(stats: apm.map { bbc_apm_metrics($0) }, peak: peak)
         } catch {
             try? FileManager.default.removeItem(at: processedURL)
@@ -106,9 +106,10 @@ enum AudioTrackMixer {
     }
 
     private static func render(
-        _ input: RenderInput, progress: (@Sendable (Double) -> Void)?
+        _ input: RenderInput, progress: (@Sendable (Double) async -> Void)?
     ) async throws -> Float {
         var limiter = StreamingLimiter(ceiling: pow(10, -1.0 / 20.0), releaseSeconds: 0.1)
+        var progressGate = ProcessingProgressGate(minimumStep: 0.01)
         var rendered = 0
         var peak: Float = 0
         while rendered < input.totalFrames {
@@ -126,7 +127,10 @@ enum AudioTrackMixer {
                                              limiter: &limiter, peak: &peak)
             try input.output.write(from: buffer)
             rendered += count
-            progress?(min(1, Double(rendered) / Double(input.totalFrames)))
+            let currentProgress = min(1, Double(rendered) / Double(input.totalFrames))
+            if let reportedProgress = progressGate.valueToReport(currentProgress) {
+                await progress?(reportedProgress)
+            }
         }
         return peak
     }
@@ -228,12 +232,30 @@ enum AudioTrackMixer {
     }
 }
 
-private struct TrackReaders {
+nonisolated struct ProcessingProgressGate {
+    let minimumStep: Double
+    private var lastReported = -Double.infinity
+
+    init(minimumStep: Double) {
+        self.minimumStep = minimumStep
+    }
+
+    mutating func valueToReport(_ value: Double) -> Double? {
+        guard value.isFinite else { return nil }
+        let clamped = min(max(value, 0), 1)
+        guard clamped > lastReported,
+              clamped == 1 || clamped - lastReported >= minimumStep else { return nil }
+        lastReported = clamped
+        return clamped
+    }
+}
+
+nonisolated private struct TrackReaders {
     let system: PCMTrackReader?
     let microphone: PCMTrackReader?
 }
 
-private struct RenderInput {
+nonisolated private struct RenderInput {
     let totalFrames: Int
     let readers: TrackReaders
     let configuration: AudioMixConfiguration
@@ -242,7 +264,7 @@ private struct RenderInput {
     let apm: OpaquePointer?
 }
 
-private struct MixFrame {
+nonisolated private struct MixFrame {
     let system: [Float]
     let microphone: [Float]
     let count: Int
@@ -250,7 +272,7 @@ private struct MixFrame {
     let microphoneScale: Float
 }
 
-private final class PCMTrackReader {
+nonisolated private final class PCMTrackReader {
     private let reader: AVAssetReader
     private let output: AVAssetReaderTrackOutput
     private var queue: [Float] = []
@@ -307,7 +329,7 @@ private final class PCMTrackReader {
     }
 }
 
-struct StreamingLimiter {
+nonisolated struct StreamingLimiter {
     let ceiling: Float
     private let releaseCoefficient: Float
     private var gain: Float = 1

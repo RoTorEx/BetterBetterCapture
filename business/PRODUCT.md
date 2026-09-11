@@ -37,7 +37,13 @@
   footer; the full version and build identifier remain available in Settings.
 - While audio is being finalized, the main menu-bar panel keeps Start Recording
   visible but disabled and shows truthful progress. The action becomes available
-  again only after the output file is ready.
+  again only after the output file is ready. Final progress delivery is ordered
+  before the return to idle so a late update cannot leave the panel permanently busy.
+- After Stop is accepted, the disabled Stop action remains visible while capture
+  shutdown completes. Recording toggles do nothing during shutdown or audio
+  processing, and Quit is disabled until the local output is safely finalized.
+  Audio processing runs away from the main actor and throttles progress delivery
+  so long recordings cannot starve menu-bar interaction.
 - Prefer native macOS and SwiftUI interaction patterns.
 - Permission, capture, and save state must remain visible and truthful.
 - Avoid adding remote services or background infrastructure to local recording

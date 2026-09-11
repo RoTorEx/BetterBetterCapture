@@ -17,7 +17,7 @@ struct MenuBarView: View {
     @State private var menuContentHeight: CGFloat = 320
 
     private var isRecording: Bool { viewModel.isRecording }
-    private var isBusy: Bool { isRecording || viewModel.isProcessing }
+    private var isBusy: Bool { viewModel.isBusy }
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
@@ -56,7 +56,20 @@ struct MenuBarView: View {
                 }
 
                 // Recording button (stop) or Start button
-                if viewModel.isProcessing {
+                if viewModel.isStopping {
+                    VStack(alignment: .leading, spacing: 8) {
+                        MenuBarActionButton(
+                            title: "Stop Recording",
+                            systemImage: "stop.circle",
+                            accentColor: .red,
+                            isDisabled: true,
+                            isProminent: true
+                        ) {}
+                        ProgressView("Stopping recording…")
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                } else if viewModel.isProcessing {
                     VStack(alignment: .leading, spacing: 8) {
                         MenuBarActionButton(
                             title: "Start Recording",
@@ -207,7 +220,9 @@ struct MenuBarView: View {
                     openSettings()
                 }
 
-                MenuBarActionButton(title: "Quit...", systemImage: "power") {
+                MenuBarActionButton(
+                    title: "Quit...", systemImage: "power", isDisabled: isBusy
+                ) {
                     NSApplication.shared.terminate(nil)
                 }
                 .padding(.bottom, 2)

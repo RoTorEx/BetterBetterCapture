@@ -18,7 +18,7 @@ import os
 
 /// Reads and transforms PCM samples from `CMSampleBuffer` without assuming that
 /// interleaved and non-interleaved audio share the same memory layout.
-enum AudioSampleBufferProcessor {
+nonisolated enum AudioSampleBufferProcessor {
     struct Statistics {
         let sumOfSquares: Double
         let sampleCount: Int
@@ -691,7 +691,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     ///            means the file holds audio only, which happens when the capture source
     ///            stopped producing frames while audio kept flowing.
     func finishWriting(
-        progress: (@Sendable (Double) -> Void)? = nil
+        progress: (@Sendable (Double) async -> Void)? = nil
     ) async throws -> (url: URL, videoFrameCount: Int) {
         await flushAudioQueues()
         // First critical section: validate state and mark inputs as finished
@@ -956,7 +956,7 @@ extension AssetWriter {
 
     private func finishProcessing(
         result: (url: URL, videoFrameCount: Int),
-        progress: (@Sendable (Double) -> Void)?
+        progress: (@Sendable (Double) async -> Void)?
     ) async throws -> (url: URL, videoFrameCount: Int) {
         guard let finalURL = finalOutputURL else { throw AssetWriterError.noOutputURL }
         if droppedAudioBufferCount > 0 {
