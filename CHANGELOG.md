@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.3.4] - 2026-09-12
+
 - Fixed a race where hundreds of thousands of queued audio-progress updates
   could starve the main UI and leave the menu-bar panel permanently busy after
   a recording had saved. Audio finalization now runs on a concurrent executor
