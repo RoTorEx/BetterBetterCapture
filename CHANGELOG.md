@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.3.6] - 2026-09-14
+
 - Fixed the sine-wave recording icon resizing the macOS menu-bar item; its
   transparent renditions now match the idle icon's fixed dimensions.
 
