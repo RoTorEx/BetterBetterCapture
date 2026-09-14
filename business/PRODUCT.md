@@ -56,3 +56,6 @@
 - The application icon uses the white mark on a teal rounded square.
 - The menu-bar item uses the same geometry as a monochrome template image so it
   remains legible across macOS appearances and highlighted states.
+- During either screen-and-audio or audio-only recording, the menu-bar item uses
+  the shared red sine-wave recording mark instead of mode-specific camera or
+  microphone symbols.

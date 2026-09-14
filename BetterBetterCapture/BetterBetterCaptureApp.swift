@@ -109,15 +109,20 @@ struct BetterBetterCaptureApp: App {
     }
 }
 
-/// The label shown in the menu bar. Uses a static film icon when idle and a
-/// red camera or microphone icon while recording, depending on the recording mode.
+/// The label shown in the menu bar. Uses the product mark when idle and a red
+/// waveform icon while either screen-and-audio or audio-only recording is active.
 struct MenuBarLabel: View {
     let viewModel: RecorderViewModel
 
     var body: some View {
-        if let recordingIconName {
-            Image(systemName: recordingIconName)
+        if viewModel.isRecording {
+            Image("RecordingIcon")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
                 .foregroundStyle(.red)
+                .accessibilityLabel("Recording")
         } else {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -126,12 +131,5 @@ struct MenuBarLabel: View {
                 .frame(width: 18, height: 18)
                 .foregroundStyle(.primary)
         }
-    }
-
-    private var recordingIconName: String? {
-        if viewModel.isRecording {
-            return viewModel.settings.recordAudioOnly ? "mic.circle.fill" : "video.circle.fill"
-        }
-        return nil
     }
 }

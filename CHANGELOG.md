@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Menu-bar recording status now uses the shared sine-wave icon for both video
+  and audio-only recordings.
+
 ## [2026.3.4] - 2026-09-12
 
 - Fixed a race where hundreds of thousands of queued audio-progress updates
