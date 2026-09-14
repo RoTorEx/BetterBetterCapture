@@ -59,3 +59,6 @@
 - During either screen-and-audio or audio-only recording, the menu-bar item uses
   the shared red sine-wave recording mark instead of mode-specific camera or
   microphone symbols.
+- Recording-state artwork uses transparent 18×18 and 36×36 template renditions,
+  matching the idle menu-bar asset sizes so state changes cannot resize the
+  macOS status item or introduce an artwork background.

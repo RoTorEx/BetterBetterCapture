@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Fixed the sine-wave recording icon resizing the macOS menu-bar item; its
+  transparent renditions now match the idle icon's fixed dimensions.
+
 ## [2026.3.5] - 2026-09-14
 
 - Menu-bar recording status now uses the shared sine-wave icon for both video
