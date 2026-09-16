@@ -14,254 +14,8 @@ import ScreenCaptureKit
 import VideoToolbox
 import os
 
-// MARK: - Audio Sample Processing
-
-/// Reads and transforms PCM samples from `CMSampleBuffer` without assuming that
-/// interleaved and non-interleaved audio share the same memory layout.
-nonisolated enum AudioSampleBufferProcessor {
-    struct Statistics {
-        let sumOfSquares: Double
-        let sampleCount: Int
-    }
-
-    private struct BufferSegment {
-        let dataPointer: UnsafeMutableRawPointer
-        let byteCount: Int
-    }
-
-    private struct BufferInfo {
-        let formatDescription: CMAudioFormatDescription
-        let buffers: [BufferSegment]
-        let totalLength: Int
-        let sampleCount: Int
-        let timingInfo: CMSampleTimingInfo
-        let isFloat: Bool
-        let isBigEndian: Bool
-        let bytesPerSample: Int
-        let retainedBlockBuffer: CMBlockBuffer?
-    }
-
-    static func statistics(from sampleBuffer: CMSampleBuffer) -> Statistics? {
-        guard let info = parse(sampleBuffer) else { return nil }
-        return computeStatistics(from: info)
-    }
-
-    static func applyingGain(to sampleBuffer: CMSampleBuffer, multiplier: Double) -> CMSampleBuffer? {
-        guard let info = parse(sampleBuffer) else { return nil }
-        guard info.totalLength > 0 else { return nil }
-
-        guard let memory = CFAllocatorAllocate(kCFAllocatorDefault, info.totalLength, 0) else {
-            return nil
-        }
-
-        guard copySamples(from: info, to: memory, multiplier: multiplier) else {
-            CFAllocatorDeallocate(kCFAllocatorDefault, memory)
-            return nil
-        }
-
-        var blockBuffer: CMBlockBuffer?
-        let blockStatus = CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault,
-            memoryBlock: memory,
-            blockLength: info.totalLength,
-            blockAllocator: kCFAllocatorDefault,
-            customBlockSource: nil,
-            offsetToData: 0,
-            dataLength: info.totalLength,
-            flags: 0,
-            blockBufferOut: &blockBuffer
-        )
-        guard blockStatus == noErr, let blockBuffer else {
-            CFAllocatorDeallocate(kCFAllocatorDefault, memory)
-            return nil
-        }
-
-        var newSampleBuffer: CMSampleBuffer?
-        var timingInfo = info.timingInfo
-        let sampleStatus = CMSampleBufferCreate(
-            allocator: kCFAllocatorDefault,
-            dataBuffer: blockBuffer,
-            dataReady: true,
-            makeDataReadyCallback: nil,
-            refcon: nil,
-            formatDescription: info.formatDescription,
-            sampleCount: info.sampleCount,
-            sampleTimingEntryCount: 1,
-            sampleTimingArray: &timingInfo,
-            sampleSizeEntryCount: 0,
-            sampleSizeArray: nil,
-            sampleBufferOut: &newSampleBuffer
-        )
-        guard sampleStatus == noErr, let newSampleBuffer else {
-            return nil
-        }
-
-        return newSampleBuffer
-    }
-
-    private static func parse(_ sampleBuffer: CMSampleBuffer) -> BufferInfo? {
-        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
-              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) else {
-            return nil
-        }
-
-        var bufferListSize = 0
-        let sizeStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer,
-            bufferListSizeNeededOut: &bufferListSize,
-            bufferListOut: nil,
-            bufferListSize: 0,
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
-            blockBufferOut: nil
-        )
-        guard sizeStatus == noErr, bufferListSize > 0 else { return nil }
-
-        let rawBufferList = UnsafeMutableRawPointer.allocate(
-            byteCount: bufferListSize,
-            alignment: MemoryLayout<AudioBufferList>.alignment
-        )
-        defer {
-            rawBufferList.deallocate()
-        }
-
-        let audioBufferList = rawBufferList.bindMemory(to: AudioBufferList.self, capacity: 1)
-        var retainedBlockBuffer: CMBlockBuffer?
-        let bufferStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: audioBufferList,
-            bufferListSize: bufferListSize,
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
-            blockBufferOut: &retainedBlockBuffer
-        )
-        guard bufferStatus == noErr else { return nil }
-
-        var segments: [BufferSegment] = []
-        var totalLength = 0
-        for buffer in UnsafeMutableAudioBufferListPointer(audioBufferList) {
-            guard let dataPointer = buffer.mData, buffer.mDataByteSize > 0 else {
-                continue
-            }
-            let byteCount = Int(buffer.mDataByteSize)
-            segments.append(BufferSegment(dataPointer: dataPointer, byteCount: byteCount))
-            totalLength += byteCount
-        }
-        guard !segments.isEmpty, totalLength > 0 else { return nil }
-
-        let bytesPerSample = Int(asbd.pointee.mBitsPerChannel) / 8
-        let isFloat = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsFloat != 0
-        let isBigEndian = asbd.pointee.mFormatFlags & kLinearPCMFormatFlagIsBigEndian != 0
-
-        guard bytesPerSample > 0 else { return nil }
-
-        let sampleCount = CMSampleBufferGetNumSamples(sampleBuffer)
-        var timingInfo = CMSampleTimingInfo()
-        guard CMSampleBufferGetSampleTimingInfo(sampleBuffer, at: 0, timingInfoOut: &timingInfo) == noErr else {
-            return nil
-        }
-
-        return BufferInfo(
-            formatDescription: formatDescription,
-            buffers: segments,
-            totalLength: totalLength,
-            sampleCount: sampleCount,
-            timingInfo: timingInfo,
-            isFloat: isFloat,
-            isBigEndian: isBigEndian,
-            bytesPerSample: bytesPerSample,
-            retainedBlockBuffer: retainedBlockBuffer
-        )
-    }
-
-    private static func computeStatistics(from info: BufferInfo) -> Statistics? {
-        var sum: Double = 0
-        var sampleCount = 0
-
-        for buffer in info.buffers {
-            let samplesInBuffer = buffer.byteCount / info.bytesPerSample
-
-            if info.isFloat && info.bytesPerSample == MemoryLayout<Float>.size {
-                let samples = buffer.dataPointer.bindMemory(to: Float.self, capacity: samplesInBuffer)
-                for index in 0..<samplesInBuffer {
-                    let sample = Double(samples[index])
-                    sum += sample * sample
-                    sampleCount += 1
-                }
-            } else if !info.isFloat && info.bytesPerSample == MemoryLayout<Int16>.size {
-                let samples = buffer.dataPointer.bindMemory(to: Int16.self, capacity: samplesInBuffer)
-                for index in 0..<samplesInBuffer {
-                    let rawValue = samples[index]
-                    let sampleValue = info.isBigEndian ? Int16(bigEndian: rawValue) : rawValue
-                    let normalized = Double(sampleValue) / Double(Int16.max)
-                    sum += normalized * normalized
-                    sampleCount += 1
-                }
-            } else {
-                return nil
-            }
-        }
-
-        guard sampleCount > 0 else { return nil }
-        return Statistics(sumOfSquares: sum, sampleCount: sampleCount)
-    }
-
-    private static func copySamples(
-        from info: BufferInfo,
-        to memory: UnsafeMutableRawPointer,
-        multiplier: Double
-    ) -> Bool {
-        var destinationOffset = 0
-
-        for buffer in info.buffers {
-            let samplesInBuffer = buffer.byteCount / info.bytesPerSample
-            let destinationPointer = memory.advanced(by: destinationOffset)
-
-            if info.isFloat && info.bytesPerSample == MemoryLayout<Float>.size {
-                let source = buffer.dataPointer.bindMemory(to: Float.self, capacity: samplesInBuffer)
-                let destination = destinationPointer.bindMemory(to: Float.self, capacity: samplesInBuffer)
-                for index in 0..<samplesInBuffer {
-                    destination[index] = Float(limitedSample(Double(source[index]) * multiplier))
-                }
-            } else if !info.isFloat && info.bytesPerSample == MemoryLayout<Int16>.size {
-                let source = buffer.dataPointer.bindMemory(to: Int16.self, capacity: samplesInBuffer)
-                let destination = destinationPointer.bindMemory(to: Int16.self, capacity: samplesInBuffer)
-                for index in 0..<samplesInBuffer {
-                    let rawValue = source[index]
-                    let sampleValue = info.isBigEndian ? Int16(bigEndian: rawValue) : rawValue
-                    let normalized = Double(sampleValue) / Double(Int16.max)
-                    let scaled = limitedSample(normalized * multiplier)
-                    let clamped = Int16(max(Double(Int16.min), min(Double(Int16.max), scaled * Double(Int16.max))))
-                    destination[index] = info.isBigEndian ? clamped.bigEndian : clamped
-                }
-            } else {
-                return false
-            }
-
-            destinationOffset += buffer.byteCount
-        }
-
-        return true
-    }
-
-    private static func limitedSample(_ sample: Double) -> Double {
-        let threshold = 0.95
-
-        if sample > threshold {
-            return threshold + (1 - threshold) * tanh((sample - threshold) / (1 - threshold))
-        }
-        if sample < -threshold {
-            return -threshold + (1 - threshold) * tanh((sample + threshold) / (1 - threshold))
-        }
-        return sample
-    }
-}
-
 /// Service responsible for writing captured media to disk using AVAssetWriter
-final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable {
+nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -270,6 +24,8 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var audioInput: AVAssetWriterInput?
     private var microphoneInput: AVAssetWriterInput?
+    private var recoveryJournal: AudioRecoveryJournal?
+    private var recoveryError: Error?
     private var shouldPostProcessAudio = false
     private var activeAudioCodec: AudioCodec = .aac
     private var activeAudioBitrate: AudioBitrate = .standard
@@ -291,6 +47,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture", category: "AssetWriter")
 
     // Track if we've received the first sample
+    private var didCaptureSamples = false
     private var hasStartedSession = false
     private var sessionStartTime: CMTime = .zero
 
@@ -312,31 +69,41 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
     private weak var audioLevelMonitor: AudioLevelMonitor?
 
-    // MARK: - Audio Gain
-
-    private var systemAudioGainState = AudioGainState(mode: .auto)
-    private var microphoneGainState = AudioGainState(mode: .auto)
-
     init(audioLevelMonitor: AudioLevelMonitor? = nil) {
         self.audioLevelMonitor = audioLevelMonitor
     }
 
     // MARK: - Setup
 
+    @MainActor private func prepareCapture(url: URL, directory: URL, fileType: AVFileType, settings: SettingsStore) throws -> URL {
+        let captureURL = directory.appending(
+            path: url.deletingPathExtension().lastPathComponent + "-unprocessed.mov")
+        assetWriter = try AVAssetWriter(outputURL: captureURL, fileType: fileType)
+
+        guard let assetWriter else {
+            throw AssetWriterError.failedToCreateWriter
+        }
+        if fileType == .mov || fileType == .mp4 {
+            assetWriter.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
+        }
+        recoveryError = nil
+        if settings.captureSystemAudio || settings.captureMicrophone {
+            recoveryJournal = try AudioRecoveryJournal(directory: directory.appending(
+                path: url.deletingPathExtension().lastPathComponent + "-recovery"))
+        }
+
+        return captureURL
+    }
+
     /// Prepares the asset writer for recording
     /// - Parameters:
     ///   - url: The output file URL
     ///   - settings: The settings store containing encoding configuration
     ///   - videoSize: The dimensions of the video
-    func setup(url: URL, settings: SettingsStore, videoSize: CGSize) throws {
+    @MainActor func setup(url: URL, settings: SettingsStore, videoSize: CGSize) throws {
         // Ensure output directory exists
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-
-        // Remove existing file if present
-        if FileManager.default.fileExists(atPath: url.path()) {
-            try FileManager.default.removeItem(at: url)
-        }
 
         // Create asset writer. Audio-only recordings use audio-focused file types.
         let fileType: AVFileType
@@ -347,13 +114,8 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         } else {
             fileType = settings.containerFormat == .mov ? .mov : .mp4
         }
-        let captureURL = directory.appending(path: ".\(UUID().uuidString)-capture.\(url.pathExtension)")
-        try? FileManager.default.removeItem(at: captureURL)
-        assetWriter = try AVAssetWriter(outputURL: captureURL, fileType: fileType)
-
-        guard let assetWriter else {
-            throw AssetWriterError.failedToCreateWriter
-        }
+        let captureURL = try prepareCapture(url: url, directory: directory, fileType: fileType, settings: settings)
+        guard let assetWriter else { throw AssetWriterError.failedToCreateWriter }
 
         // Configure video input unless audio-only recording is active
         if !settings.recordAudioOnly {
@@ -412,13 +174,12 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
         outputURL = captureURL
         finalOutputURL = url
+        didCaptureSamples = false
         hasStartedSession = false
         sessionStartTime = .zero
         lastVideoPresentationTime = .invalid
         frameCount = 0
 
-        systemAudioGainState.reset(mode: .off)
-        microphoneGainState.reset(mode: .off)
         shouldPostProcessAudio = settings.captureSystemAudio || settings.captureMicrophone
         activeAudioCodec = settings.audioCodec
         activeAudioBitrate = settings.audioBitrate
@@ -492,10 +253,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
             // Start session on first sample
             if !hasStartedSession {
-                assetWriter.startSession(atSourceTime: presentationTime)
-                sessionStartTime = presentationTime
-                hasStartedSession = true
-                logger.info("Session started at time: \(presentationTime.seconds)")
+                startSessionIfNeeded(assetWriter: assetWriter, sampleBuffer: sampleBuffer)
             } else {
                 // Guard against non-monotonic timestamps. Presenter Overlay can
                 // cause timing glitches when compositing the camera into the
@@ -551,9 +309,10 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             guard let assetWriter, assetWriter.status == .writing, let audioInput else {
                 return
             }
-            let processedBuffer = systemAudioGainState.process(sampleBuffer) ?? sampleBuffer
+            let processedBuffer = sampleBuffer
             audioLevelMonitor?.processSystemAudioSample(processedBuffer)
             startSessionIfNeeded(assetWriter: assetWriter, sampleBuffer: processedBuffer)
+            journalAudio(processedBuffer, source: "system")
             guard systemAudioQueue.count < maximumQueuedAudioBuffers else {
                 droppedAudioBufferCount += 1
                 logger.error("System audio FIFO overflow")
@@ -570,9 +329,10 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             guard let assetWriter, assetWriter.status == .writing, let microphoneInput else {
                 return
             }
-            let processedBuffer = microphoneGainState.process(sampleBuffer) ?? sampleBuffer
+            let processedBuffer = sampleBuffer
             audioLevelMonitor?.processMicrophoneSample(processedBuffer)
             startSessionIfNeeded(assetWriter: assetWriter, sampleBuffer: processedBuffer)
+            journalAudio(processedBuffer, source: "microphone")
             guard microphoneQueue.count < maximumQueuedAudioBuffers else {
                 droppedAudioBufferCount += 1
                 logger.error("Microphone FIFO overflow")
@@ -583,12 +343,28 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         }
     }
 
+    private func journalAudio(_ sample: CMSampleBuffer, source: String) {
+        guard recoveryError == nil else { return }
+        do {
+            try recoveryJournal?.append(sample, source: source, origin: sessionStartTime)
+        } catch {
+            recoveryError = error
+            logger.error("Audio recovery write failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Called only after capture has stopped, before another writer is installed.
+    func checkpointRecovery() throws {
+        try lock.withLockUnchecked { try recoveryJournal?.close() }
+    }
+
     private func startSessionIfNeeded(assetWriter: AVAssetWriter, sampleBuffer: CMSampleBuffer) {
         guard !hasStartedSession else { return }
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         assetWriter.startSession(atSourceTime: presentationTime)
         sessionStartTime = presentationTime
         hasStartedSession = true
+        didCaptureSamples = true
         logger.info("Session started at time: \(presentationTime.seconds)")
     }
 
@@ -606,93 +382,16 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         return 0
     }
 
-    // MARK: - Audio Gain Helpers
-
-    /// Holds state for automatic or fixed gain on one audio source.
-    private struct AudioGainState {
-        var mode: AudioGainMode
-
-        private var autoMultiplier: Double = 1.0
-        private var isCalibrated: Bool = false
-        private var rmsSum: Double = 0
-        private var sampleCount: Int = 0
-        private var voicedStartTime: CMTime = .invalid
-
-        private let calibrationDuration: TimeInterval = 0.75
-        private let targetRMS: Double = 0.1 // roughly -20 dB
-        private let maxMultiplier: Double = 10.0 // +20 dB
-        private let minimumCalibrationRMS: Double = 0.003 // roughly -50 dB
-
-        init(mode: AudioGainMode) {
-            self.mode = mode
-        }
-
-        mutating func reset(mode: AudioGainMode) {
-            self.mode = mode
-            autoMultiplier = 1.0
-            isCalibrated = false
-            rmsSum = 0
-            sampleCount = 0
-            voicedStartTime = .invalid
-        }
-
-        /// Returns a new sample buffer with gain applied, or the original buffer
-        /// when no gain is required. Returns `nil` if the buffer cannot be parsed.
-        mutating func process(_ sampleBuffer: CMSampleBuffer) -> CMSampleBuffer? {
-            guard mode != .off else { return sampleBuffer }
-
-            guard let statistics = AudioSampleBufferProcessor.statistics(from: sampleBuffer) else { return nil }
-
-            let multiplier: Double
-            if mode == .auto {
-                let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                if !isCalibrated {
-                    let bufferRMS = sqrt(statistics.sumOfSquares / Double(statistics.sampleCount))
-                    if bufferRMS >= minimumCalibrationRMS {
-                        if !voicedStartTime.isValid {
-                            voicedStartTime = presentationTime
-                        }
-                        rmsSum += statistics.sumOfSquares
-                        sampleCount += statistics.sampleCount
-
-                        let elapsed = presentationTime.seconds - voicedStartTime.seconds
-                        if elapsed >= calibrationDuration {
-                            calibrate()
-                        }
-                    }
-                }
-
-                multiplier = isCalibrated ? autoMultiplier : 1.0
-            } else {
-                multiplier = mode.linearGain
-            }
-
-            guard multiplier != 1.0 else { return sampleBuffer }
-
-            return AudioSampleBufferProcessor.applyingGain(to: sampleBuffer, multiplier: multiplier)
-        }
-
-        private mutating func calibrate() {
-            guard sampleCount > 0 else {
-                isCalibrated = true
-                return
-            }
-            let averageRMS = sqrt(rmsSum / Double(sampleCount))
-            let computed = targetRMS / averageRMS
-            autoMultiplier = max(1.0, min(computed, maxMultiplier))
-            isCalibrated = true
-        }
-    }
-
     // MARK: - Finalization
 
     /// Finishes writing and finalizes the output file
     /// - Returns: The output URL and the number of video frames written. A count of zero
     ///            means the file holds audio only, which happens when the capture source
     ///            stopped producing frames while audio kept flowing.
-    func finishWriting(
+    @concurrent func finishWriting(
         progress: (@Sendable (Double) async -> Void)? = nil
     ) async throws -> (url: URL, videoFrameCount: Int) {
+        try checkpointRecovery()
         await flushAudioQueues()
         // First critical section: validate state and mark inputs as finished
         let (writerToFinish, url): (AVAssetWriter, URL)
@@ -765,7 +464,14 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     /// Cancels the current writing session
     func cancel() {
         lock.withLockUnchecked {
+            let hasCapturedSamples = didCaptureSamples
+            // AVAssetWriter.cancelWriting deletes its configured destination.
+            // Move an interrupted capture aside before cancelling the writer.
+            let preservedURL = preserveCaptureBeforeCancellation()
             assetWriter?.cancelWriting()
+            if let preservedURL, let outputURL {
+                try? FileManager.default.moveItem(at: preservedURL, to: outputURL)
+            }
             isWriting = false
             hasStartedSession = false
             lastVideoPresentationTime = .invalid
@@ -773,11 +479,16 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
             tagBuffersWithHDRColorimetry = false
             frameCount = 0
 
-            // Clean up temp file if it exists
-            if let url = outputURL {
+            // Never delete captured samples on an error or cancellation.
+            try? recoveryJournal?.close()
+            if let url = outputURL, !hasCapturedSamples {
                 try? FileManager.default.removeItem(at: url)
             }
 
+            if !hasCapturedSamples, let journal = recoveryJournal {
+                try? FileManager.default.removeItem(at: journal.directory)
+            }
+            recoveryJournal = nil
             assetWriter = nil
             videoInput = nil
             pixelBufferAdaptor = nil
@@ -793,9 +504,23 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         }
     }
 
+    private func preserveCaptureBeforeCancellation() -> URL? {
+        guard didCaptureSamples, let outputURL,
+              FileManager.default.fileExists(atPath: outputURL.path) else { return nil }
+        let preserved = outputURL.deletingPathExtension()
+            .appendingPathExtension(UUID().uuidString + ".mov")
+        do {
+            try FileManager.default.moveItem(at: outputURL, to: preserved)
+            return preserved
+        } catch {
+            logger.error("Could not preserve interrupted container; audio recovery chunks remain: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     // MARK: - Settings Helpers
 
-    private func createVideoSettings(from settings: SettingsStore, size: CGSize) -> [String: Any] {
+    @MainActor private func createVideoSettings(from settings: SettingsStore, size: CGSize) -> [String: Any] {
         var videoSettings: [String: Any] = [
             AVVideoWidthKey: Int(size.width),
             AVVideoHeightKey: Int(size.height)
@@ -918,7 +643,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
         )
     }
 
-    private func createAudioSettings(from settings: SettingsStore) -> [String: Any] {
+    @MainActor private func createAudioSettings(from settings: SettingsStore) -> [String: Any] {
         [AVFormatIDKey: kAudioFormatAppleLossless, AVSampleRateKey: 48_000,
          AVNumberOfChannelsKey: 2, AVEncoderBitDepthHintKey: 24]
     }
@@ -954,22 +679,24 @@ extension AssetWriter {
         }
     }
 
-    private func finishProcessing(
+    @concurrent private func finishProcessing(
         result: (url: URL, videoFrameCount: Int),
         progress: (@Sendable (Double) async -> Void)?
     ) async throws -> (url: URL, videoFrameCount: Int) {
         guard let finalURL = finalOutputURL else { throw AssetWriterError.noOutputURL }
+        if let recoveryError { throw recoveryError }
         if droppedAudioBufferCount > 0 {
-            let recoveryURL = makeRecoveryURL(for: finalURL)
-            try? FileManager.default.moveItem(at: result.url, to: recoveryURL)
-            finalOutputURL = nil
             throw AssetWriterError.audioBuffersDropped(droppedAudioBufferCount)
         }
+        let workingURL = result.url.deletingLastPathComponent().appending(
+            path: ".\(UUID().uuidString)-working.\(finalURL.pathExtension)")
+        try FileManager.default.copyItem(at: result.url, to: workingURL)
+        defer { try? FileManager.default.removeItem(at: workingURL) }
         let audioTracks = try await AVURLAsset(url: result.url).loadTracks(withMediaType: .audio)
         if shouldPostProcessAudio && !audioTracks.isEmpty {
             do {
                 let report = try await AudioTrackMixer.mixTracks(
-                    in: result.url,
+                    in: workingURL,
                     configuration: AudioMixConfiguration(
                         codec: activeAudioCodec, bitrate: activeAudioBitrate,
                         hasSystemAudio: activeHasSystemAudio,
@@ -983,31 +710,24 @@ extension AssetWriter {
                 logger.info("AEC residual echo: \(String(describing: report.residualEchoLikelihood))")
                 logger.info("AEC delay: \(String(describing: report.estimatedDelayMS))ms")
             } catch {
-                let recoveryURL = makeRecoveryURL(for: finalURL)
-                if !FileManager.default.fileExists(atPath: recoveryURL.path) {
-                    try? FileManager.default.moveItem(at: result.url, to: recoveryURL)
-                }
-                logger.error("Audio processing failed; recoverable capture: \(recoveryURL.lastPathComponent)")
+                logger.error("Audio processing failed; original capture kept: \(result.url.lastPathComponent)")
                 throw error
             }
         }
         shouldPostProcessAudio = false
-        if FileManager.default.fileExists(atPath: finalURL.path) {
-            _ = try FileManager.default.replaceItemAt(finalURL, withItemAt: result.url)
-        } else {
-            try FileManager.default.moveItem(at: result.url, to: finalURL)
+        // Names are reserved before capture; never overwrite an unrelated output.
+        try FileManager.default.moveItem(at: workingURL, to: finalURL)
+        let handle = try FileHandle(forWritingTo: finalURL)
+        try RecordingFileSync.synchronize(handle)
+        try handle.close()
+        // Cleanup is best effort and happens only after the destination is durable.
+        try? FileManager.default.removeItem(at: result.url)
+        if let journal = recoveryJournal {
+            try? FileManager.default.removeItem(at: journal.directory)
         }
+        recoveryJournal = nil
         finalOutputURL = nil
         return (finalURL, result.videoFrameCount)
-    }
-
-    private func makeRecoveryURL(for finalURL: URL) -> URL {
-        let preferred = finalURL.deletingLastPathComponent().appending(
-            path: finalURL.deletingPathExtension().lastPathComponent + "-unprocessed.mov")
-        guard FileManager.default.fileExists(atPath: preferred.path) else { return preferred }
-        return finalURL.deletingLastPathComponent().appending(
-            path: finalURL.deletingPathExtension().lastPathComponent
-                + "-unprocessed-\(UUID().uuidString).mov")
     }
 
     func captureEngine(
@@ -1029,207 +749,9 @@ extension AssetWriter {
     }
 }
 
-// MARK: - Audio Level Monitor
-
-/// Computes audio levels from CMSampleBuffer PCM samples and publishes
-/// smoothed 0...1 levels for system audio and microphone sources.
-@MainActor
-@Observable
-final class AudioLevelMonitor {
-    private(set) var systemAudioLevel: CGFloat = 0
-    private(set) var microphoneLevel: CGFloat = 0
-
-    nonisolated private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture",
-        category: "AudioLevelMonitor"
-    )
-    nonisolated(unsafe) private static var lastLogDate = Date.distantPast
-    nonisolated private static let logInterval: TimeInterval = 1.0
-
-    nonisolated func processSystemAudioSample(_ sampleBuffer: CMSampleBuffer) {
-        let level = Self.computeLevel(from: sampleBuffer)
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.systemAudioLevel = Self.smooth(current: self.systemAudioLevel, target: level)
-        }
-    }
-
-    nonisolated func processMicrophoneSample(_ sampleBuffer: CMSampleBuffer) {
-        let level = Self.computeLevel(from: sampleBuffer)
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.microphoneLevel = Self.smooth(current: self.microphoneLevel, target: level)
-        }
-    }
-
-    nonisolated private static func smooth(current: CGFloat, target: CGFloat) -> CGFloat {
-        let attack: CGFloat = 0.6
-        let decay: CGFloat = 0.8
-
-        if target > current {
-            return current * (1 - attack) + target * attack
-        } else {
-            return max(current * decay, 0)
-        }
-    }
-
-    nonisolated private static func computeLevel(from sampleBuffer: CMSampleBuffer) -> CGFloat {
-        guard let statistics = AudioSampleBufferProcessor.statistics(from: sampleBuffer),
-              statistics.sampleCount > 0 else {
-            return 0
-        }
-
-        let rms = sqrt(statistics.sumOfSquares / Double(statistics.sampleCount))
-        let level = levelFromDecibels(rms: rms)
-
-        let now = Date()
-        if now.timeIntervalSince(Self.lastLogDate) >= Self.logInterval {
-            Self.lastLogDate = now
-            Self.logger.debug(
-                "Audio level debug — samples=\(statistics.sampleCount), rms=\(rms), level=\(level)"
-            )
-        }
-
-        return CGFloat(level)
-    }
-
-    /// Converts an RMS value to a perceptual 0...1 level using a dB scale with a noise floor.
-    /// Uses a -40 dB floor and a square-root curve so low-level noise is visually suppressed.
-    nonisolated private static func levelFromDecibels(rms: Double) -> Double {
-        let minDb: Double = -40
-        let maxDb: Double = 0
-
-        // Hard silence gate: anything below -45 dB is treated as absolute silence.
-        let silenceThreshold: Double = 0.0056 // -45 dB
-        if rms < silenceThreshold {
-            return 0
-        }
-
-        // Avoid log10(0)
-        let db = 20 * log10(max(rms, 0.0000001))
-        let clampedDb = min(max(db, minDb), maxDb)
-        let linear = (clampedDb - minDb) / (maxDb - minDb)
-        // Square-root curve suppresses low-level noise visually.
-        return sqrt(linear)
-    }
-
-    nonisolated static func defaultOutputDeviceName() -> String {
-        defaultDeviceName(selector: kAudioHardwarePropertyDefaultOutputDevice, fallback: "System Audio")
-    }
-
-    nonisolated static func defaultInputDeviceName() -> String {
-        defaultDeviceName(selector: kAudioHardwarePropertyDefaultInputDevice, fallback: "System Microphone")
-    }
-
-    nonisolated private static func defaultDeviceName(selector: AudioObjectPropertySelector, fallback: String) -> String {
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: selector,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        var deviceID: AudioObjectID = 0
-        var propertySize = UInt32(MemoryLayout<AudioObjectID>.size)
-
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &propertySize,
-            &deviceID
-        )
-
-        guard status == noErr else { return fallback }
-
-        var namePropertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioObjectPropertyName,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        var unmanagedName: Unmanaged<CFString>?
-        var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-
-        let nameStatus = AudioObjectGetPropertyData(
-            deviceID,
-            &namePropertyAddress,
-            0,
-            nil,
-            &nameSize,
-            &unmanagedName
-        )
-
-        guard nameStatus == noErr, let cfName = unmanagedName?.takeUnretainedValue() else {
-            return fallback
-        }
-
-        return cfName as String
-    }
-
-    /// Resets published audio levels to zero, called when recording stops.
-    func resetLevels() {
-        systemAudioLevel = 0
-        microphoneLevel = 0
-    }
-
-    /// Reads the current scalar volume (0...1) of the default output device, if available.
-    nonisolated static func defaultOutputVolume() -> Float? {
-        defaultDeviceVolume(selector: kAudioHardwarePropertyDefaultOutputDevice, scope: kAudioObjectPropertyScopeOutput)
-    }
-
-    /// Reads the current scalar volume (0...1) of the default input device, if available.
-    nonisolated static func defaultInputVolume() -> Float? {
-        defaultDeviceVolume(selector: kAudioHardwarePropertyDefaultInputDevice, scope: kAudioObjectPropertyScopeInput)
-    }
-
-    nonisolated private static func defaultDeviceVolume(selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope) -> Float? {
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: selector,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        var deviceID: AudioObjectID = 0
-        var propertySize = UInt32(MemoryLayout<AudioObjectID>.size)
-
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &propertySize,
-            &deviceID
-        )
-
-        guard status == noErr else { return nil }
-
-        var volumeAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyVolumeScalar,
-            mScope: scope,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        var volume: Float = 0
-        var volumeSize = UInt32(MemoryLayout<Float>.size)
-
-        let volumeStatus = AudioObjectGetPropertyData(
-            deviceID,
-            &volumeAddress,
-            0,
-            nil,
-            &volumeSize,
-            &volume
-        )
-
-        guard volumeStatus == noErr else { return nil }
-        return volume
-    }
-}
-
 // MARK: - Errors
 
-enum AssetWriterError: LocalizedError {
+nonisolated enum AssetWriterError: LocalizedError {
     case failedToCreateWriter
     case writerNotReady
     case failedToStartWriting(Error?)

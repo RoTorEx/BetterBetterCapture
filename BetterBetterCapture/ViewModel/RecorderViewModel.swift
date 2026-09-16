@@ -46,7 +46,9 @@ final class RecorderViewModel {
     let permissionService: PermissionService
     let audioLevelMonitor: AudioLevelMonitor
     private let captureEngine: CaptureEngine
-    private let assetWriter: AssetWriter
+    let recordingProcessor: RecordingProcessor
+    private var outputAccessURL: URL?
+    private var assetWriter: AssetWriter
     private let cameraSession = CameraSession()
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture", category: "RecorderViewModel")
@@ -66,7 +68,8 @@ final class RecorderViewModel {
         self.init(settings: SettingsStore())
     }
 
-    init(settings: SettingsStore) {
+    init(settings: SettingsStore, recordingProcessor: RecordingProcessor? = nil) {
+        self.recordingProcessor = recordingProcessor ?? RecordingProcessor()
         self.settings = settings
         self.audioDeviceService = AudioDeviceService()
         self.cameraDeviceService = CameraDeviceService()
@@ -198,6 +201,16 @@ final class RecorderViewModel {
         }
     }
 
+    private func releaseOutputAccess() {
+        outputAccessURL?.stopAccessingSecurityScopedResource()
+        outputAccessURL = nil
+    }
+
+    private func acquireOutputAccess() {
+        let directory = settings.outputDirectory
+        if directory.startAccessingSecurityScopedResource() { outputAccessURL = directory }
+    }
+
     /// Starts a new recording session
     func startRecording() async {
         guard canStartRecording else {
@@ -242,7 +255,7 @@ final class RecorderViewModel {
             logger.info("Video size: \(self.videoSize.width)x\(self.videoSize.height)")
 
             // Access security-scoped output directory before writing
-            _ = settings.startAccessingOutputDirectory()
+            acquireOutputAccess()
 
             // Setup asset writer
             let outputURL = settings.generateOutputURL()
@@ -278,7 +291,7 @@ final class RecorderViewModel {
             // The writer may already be set up and holding an empty output file. Cancel it
             // before releasing the output directory, since that is where the file lives.
             assetWriter.cancel()
-            settings.stopAccessingOutputDirectory()
+            releaseOutputAccess()
 
             // lastError has no UI representation, so every start failure has to be surfaced
             // as a notification - otherwise the record button silently does nothing.
@@ -309,44 +322,42 @@ final class RecorderViewModel {
             isPresenterOverlayActive = false
             audioLevelMonitor.resetLevels()
 
-            // Finalize file
-            state = .processing(0)
-            let (outputURL, videoFrameCount) = try await assetWriter.finishWriting { [weak self] progress in
-                await self?.updateProcessingProgress(progress)
+            let stoppedWriter = assetWriter
+            let stoppedAudioOnly = settings.recordAudioOnly
+            let accessURL = outputAccessURL
+            // Close and sync recovery audio before making capture controls available.
+            try stoppedWriter.checkpointRecovery()
+            outputAccessURL = nil
+            let filename = stoppedWriter.outputURL?.lastPathComponent ?? "Recording"
+            assetWriter = AssetWriter(audioLevelMonitor: audioLevelMonitor)
+            captureEngine.sampleBufferDelegate = assetWriter
+            recordingProcessor.enqueue(filename: filename) { [weak self] progress in
+                defer { accessURL?.stopAccessingSecurityScopedResource() }
+                do {
+                    let (url, frames) = try await stoppedWriter.finishWriting(progress: progress)
+                    guard let self else { return }
+                    if frames == 0 && !stoppedAudioOnly {
+                        self.notificationService.sendRecordingMissingVideoNotification(fileURL: url)
+                    } else {
+                        self.notificationService.sendRecordingSavedNotification(fileURL: url)
+                    }
+                } catch {
+                    stoppedWriter.cancel()
+                    self?.lastError = error
+                    self?.notificationService.sendRecordingFailedNotification(error: error)
+                }
             }
-
             state = .idle
             recordingDuration = 0
-
-            logger.info("Recording stopped and saved to: \(outputURL.lastPathComponent)")
-
-            // Brief delay to ensure screen sharing mode has fully stopped before sending notification
-            try? await Task.sleep(for: .milliseconds(100))
-
-            // Send notification. Audio-only recordings intentionally have no video frames,
-            // so treat them the same as successful screen recordings.
-            if videoFrameCount == 0 && !settings.recordAudioOnly {
-                logger.error("Recording contains no video frames: \(outputURL.lastPathComponent)")
-                notificationService.sendRecordingMissingVideoNotification(fileURL: outputURL)
-            } else {
-                notificationService.sendRecordingSavedNotification(fileURL: outputURL)
-            }
-
-            settings.stopAccessingOutputDirectory()
-
         } catch {
             state = .idle
             lastError = error
             assetWriter.cancel()
             audioLevelMonitor.resetLevels()
-            settings.stopAccessingOutputDirectory()
+            releaseOutputAccess()
             notificationService.sendRecordingFailedNotification(error: error)
             logger.error("Failed to stop recording: \(error.localizedDescription)")
         }
-    }
-
-    private func updateProcessingProgress(_ progress: Double) {
-        state = state.updatingProcessingProgress(progress)
     }
 
     /// Resets the capture selection, removing the border frame and clearing state

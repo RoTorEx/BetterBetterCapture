@@ -18,7 +18,7 @@ import Testing
 @MainActor
 struct AssetWriterTests {
 
-    private let videoSize = CGSize(width: 640, height: 480)
+    let videoSize = CGSize(width: 640, height: 480)
 
     // MARK: - Tests
 
@@ -167,18 +167,18 @@ struct AssetWriterTests {
     // MARK: - Helpers
 
     /// Creates a SettingsStore backed by a fresh, empty UserDefaults suite.
-    private func makeStore() -> SettingsStore {
+    func makeStore() -> SettingsStore {
         let suiteName = "com.betterbettercapture.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         return SettingsStore(defaults: defaults)
     }
 
-    private func makeOutputURL() -> URL {
+    func makeOutputURL() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mov")
     }
 
     /// Creates a buffer of silent 48 kHz stereo audio.
-    private func makeSilentAudioSampleBuffer(at presentationTime: CMTime) throws -> CMSampleBuffer {
+    func makeSilentAudioSampleBuffer(at presentationTime: CMTime) throws -> CMSampleBuffer {
         let frameCount: AVAudioFrameCount = 1024
 
         let format = try #require(
@@ -224,7 +224,7 @@ struct AssetWriterTests {
     }
 
     /// Creates a small non-interleaved stereo buffer with constant channel values.
-    private func makeNonInterleavedFloatAudioSampleBuffer(
+    func makeNonInterleavedFloatAudioSampleBuffer(
         leftSample: Float,
         rightSample: Float
     ) throws -> CMSampleBuffer {
@@ -280,7 +280,7 @@ struct AssetWriterTests {
     }
 
     /// Creates an empty BGRA video frame marked complete, as ScreenCaptureKit would deliver it.
-    private func makeVideoSampleBuffer(at presentationTime: CMTime) throws -> CMSampleBuffer {
+    func makeVideoSampleBuffer(at presentationTime: CMTime) throws -> CMSampleBuffer {
         var pixelBuffer: CVPixelBuffer?
         let pixelBufferStatus = CVPixelBufferCreate(
             kCFAllocatorDefault,

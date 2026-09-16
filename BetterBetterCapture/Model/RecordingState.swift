@@ -10,32 +10,22 @@ extension RecorderViewModel {
         case idle
         case recording
         case stopping
-        case processing(Double)
 
         var isRecording: Bool { self == .recording }
         var isStopping: Bool { self == .stopping }
-        var isProcessing: Bool {
-            if case .processing = self { return true }
-            return false
-        }
         var isBusy: Bool { self != .idle }
 
         var toggleAction: RecordingToggleAction {
             switch self {
             case .idle: .start
             case .recording: .stop
-            case .stopping, .processing: .none
+            case .stopping: .none
             }
         }
 
-        func updatingProcessingProgress(_ progress: Double) -> Self {
-            guard case .processing(let currentProgress) = self, progress.isFinite else { return self }
-            return .processing(min(max(progress, currentProgress), 1))
-        }
     }
 
     var isStopping: Bool { state.isStopping }
-    var isProcessing: Bool { state.isProcessing }
     var isBusy: Bool { state.isBusy }
     var isRecording: Bool { state.isRecording }
     var isAreaSelection: Bool { selectedSourceRect != nil }
@@ -68,11 +58,6 @@ extension RecorderViewModel {
             return AudioLevelMonitor.defaultInputDeviceName()
         }
         return device.name
-    }
-
-    var processingProgress: Double {
-        if case .processing(let progress) = state { return progress }
-        return 0
     }
 
     func getContentSize(from filter: SCContentFilter) async -> CGSize {

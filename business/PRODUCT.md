@@ -9,9 +9,32 @@
 - Voice microphone processing is the default: system audio is used as the
   far-end reference for WebRTC AEC3, followed by noise suppression and AGC2.
   Raw mode bypasses voice processing and permits a fixed gain.
-- Capture audio is held in a lossless intermediate and encoded once at stop.
-  Final output contains one mixed audio track; video is remuxed without a
-  second encode. A failed processing pass preserves an `unprocessed.mov` file.
+- Capture audio is held in a lossless intermediate and encoded once in a serial
+  background queue after stop. Final output contains one mixed audio track;
+  video is remuxed without a second encode. Each capture has an independent
+  writer, settings snapshot and output-directory access for its whole lifetime.
+- A visible `-unprocessed.mov` original remains until a processed copy is
+  installed and synchronized successfully. Failures never overwrite an existing
+  destination or intentionally delete captured samples. Output names remain
+  unique when recordings start within the same second.
+- During capture, separate system/microphone lossless CAF fragments are written
+  into a visible `-recovery` folder next to the output. Their filenames contain
+  the source and starting offset in seconds. Open `.partial.caf` fragments use
+  an unknown-length CAF data chunk and require no final header rewrite to read.
+  Fragments close and synchronize after about 2 seconds of source audio, and all
+  open fragments synchronize before capture controls return to idle after Stop.
+  This interval limits additional disk synchronization work while retaining
+  already committed audio during interruption. Power loss can still lose the
+  uncommitted tail or data affected by storage failure. Video containers use a
+  2-second movie-fragment interval as an additional recovery mechanism; audio
+  fragments remain the fallback when the container cannot be read.
+  Synchronization requests hardware-cache flushing (`F_FULLFSYNC`) where the
+  output volume supports it, with ordinary filesystem synchronization as the
+  fallback for unsupported volumes. Real synchronization I/O errors fail visibly.
+- Recovery files survive cancellation and restart. They are removed only after
+  successful final output installation. Interrupted jobs are not automatically
+  resumed; the user can open their original or CAF fragments from the output
+  folder using the included recovery instructions.
 - Real-time audio writer backpressure uses a bounded FIFO. Overflow or a flush
   timeout fails explicitly instead of silently producing a recording with gaps.
 - Explicit content exclusion and local-only recording storage.
@@ -35,13 +58,15 @@
   menu-bar icon or by the Toggle Window shortcut, without stopping a recording.
 - The main menu-bar panel shows the installed marketing version as a quiet
   footer; the full version and build identifier remain available in Settings.
-- While audio is being finalized, the main menu-bar panel keeps Start Recording
-  visible but disabled and shows truthful progress. The action becomes available
-  again only after the output file is ready. Final progress delivery is ordered
-  before the return to idle so a late update cannot leave the panel permanently busy.
+- After capture shutdown and recovery checkpointing, Start Recording is available
+  while previous recordings finalize. Each queued recording shows its filename,
+  progress and elapsed time. Waiting time is shown for queued jobs; processing
+  elapsed time starts when that job begins. Progress belongs to its job and
+  cannot change a newer capture's state.
 - After Stop is accepted, the disabled Stop action remains visible while capture
-  shutdown completes. Recording toggles do nothing during shutdown or audio
-  processing, and Quit is disabled until the local output is safely finalized.
+  shutdown completes. Recording toggles do nothing during shutdown. Quit is
+  disabled during capture/shutdown and available during background processing;
+  unfinished originals and recovery audio remain if the app exits.
   Audio processing runs away from the main actor and throttles progress delivery
   so long recordings cannot starve menu-bar interaction.
 - Prefer native macOS and SwiftUI interaction patterns.

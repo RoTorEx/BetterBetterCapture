@@ -210,6 +210,7 @@ nonisolated enum AudioTrackMixer {
         try destination.insertTimeRange(range, of: track, at: .zero)
         let finalURL = sourceURL.deletingLastPathComponent().appending(
             path: ".\(UUID().uuidString)-final.\(sourceURL.pathExtension)")
+        defer { try? FileManager.default.removeItem(at: finalURL) }
         guard let exporter = AVAssetExportSession(asset: composition,
                                                   presetName: AVAssetExportPresetPassthrough) else {
             throw AudioPostProcessingError.cannotCreateComposition

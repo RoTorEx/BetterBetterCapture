@@ -32,6 +32,15 @@
 - **Privacy-focused**: No tracking, no analytics, all recordings stored locally
 - **MIT licensed**: Free and open source
 
+After Stop, audio processing runs in the background with a per-file elapsed timer;
+you can start another recording once capture shutdown completes. After an
+interruption, use **Open Output Folder** to find the `-unprocessed.mov` original
+and matching `-recovery` folder. Its system/microphone CAF fragments are playable
+audio, with starting offsets in their filenames and instructions in `README.txt`.
+They remain across restarts; processing does not resume automatically. Abrupt
+power loss may lose the most recent unsynchronized audio (normally about two
+seconds), while storage failure can affect more data.
+
 ## Installation
 
 ### Homebrew

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Added elapsed processing/waiting timers for individual recordings and a serial
+  background processing queue. A new capture can start after the previous stream
+  stops, without waiting for its audio processing.
+- Preserve visible originals and independently readable raw CAF fragments during
+  capture and finalization. Audio checkpoints synchronize about every two seconds
+  and at Stop; failed processing or cancellation retains recovery material.
+- Avoid overwriting existing recordings during rapid starts or final installation.
+
 ## [2026.3.6] - 2026-09-14
 
 - Fixed the sine-wave recording icon resizing the macOS menu-bar item; its

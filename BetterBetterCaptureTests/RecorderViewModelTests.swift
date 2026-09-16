@@ -100,10 +100,7 @@ struct RecorderViewModelTests {
         let states = [
             RecordingStateExpectation(.idle, .start),
             RecordingStateExpectation(.recording, .stop, isRecording: true),
-            RecordingStateExpectation(.stopping, .none, isStopping: true),
-            RecordingStateExpectation(.processing(0), .none, isProcessing: true),
-            RecordingStateExpectation(.processing(0.5), .none, isProcessing: true),
-            RecordingStateExpectation(.processing(1), .none, isProcessing: true)
+            RecordingStateExpectation(.stopping, .none, isStopping: true)
         ]
 
         for expectation in states {
@@ -112,21 +109,9 @@ struct RecorderViewModelTests {
             #expect(state.isBusy == (state != .idle))
             #expect(state.isRecording == expectation.isRecording)
             #expect(state.isStopping == expectation.isStopping)
-            #expect(state.isProcessing == expectation.isProcessing)
         }
     }
 
-    @Test func progressOnlyChangesProcessingStateAndNeverMovesBackward() {
-        #expect(RecorderViewModel.RecordingState.idle.updatingProcessingProgress(1) == .idle)
-        #expect(RecorderViewModel.RecordingState.recording.updatingProcessingProgress(1) == .recording)
-        #expect(RecorderViewModel.RecordingState.stopping.updatingProcessingProgress(1) == .stopping)
-        #expect(RecorderViewModel.RecordingState.processing(0.6)
-            .updatingProcessingProgress(0.4) == .processing(0.6))
-        #expect(RecorderViewModel.RecordingState.processing(0.6)
-            .updatingProcessingProgress(2) == .processing(1))
-        #expect(RecorderViewModel.RecordingState.processing(0.6)
-            .updatingProcessingProgress(.nan) == .processing(0.6))
-    }
 }
 
 private struct RecordingStateExpectation {
@@ -134,19 +119,16 @@ private struct RecordingStateExpectation {
     let toggleAction: RecorderViewModel.RecordingToggleAction
     var isRecording = false
     var isStopping = false
-    var isProcessing = false
 
     init(
         _ state: RecorderViewModel.RecordingState,
         _ toggleAction: RecorderViewModel.RecordingToggleAction,
         isRecording: Bool = false,
-        isStopping: Bool = false,
-        isProcessing: Bool = false
+        isStopping: Bool = false
     ) {
         self.state = state
         self.toggleAction = toggleAction
         self.isRecording = isRecording
         self.isStopping = isStopping
-        self.isProcessing = isProcessing
     }
 }
