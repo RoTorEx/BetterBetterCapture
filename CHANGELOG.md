@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.4.0] - 2026-10-10
+
 - Added optional call name/profile selection and a native embedded XPC adapter
   for durable Voxray jobs. Failed integration preserves recordings and supports retry.
 - Store captures in UUID folders with persistent history, interrupted-session
