@@ -66,6 +66,7 @@ build:
 test:
 	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)"
 	@$(XCODEBUILD) test $(XCODE_COMMON) $(XCODE_UNSIGNED) -configuration Debug -quiet
+	@python3 scripts/check-capture-recovery.py
 
 lint:
 	@command -v swiftlint >/dev/null 2>&1 || { echo "ERROR: SwiftLint is missing. Run: make install" >&2; exit 1; }

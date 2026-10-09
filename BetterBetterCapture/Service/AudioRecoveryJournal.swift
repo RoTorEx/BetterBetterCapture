@@ -7,6 +7,7 @@ nonisolated final class AudioRecoveryJournal {
     let directory: URL
     private var sources: [String: Source] = [:]
     private let chunkDuration: Double = 2
+    private let synchronize: (FileHandle) throws -> Void
 
     private struct Source {
         var file: FileHandle
@@ -14,8 +15,9 @@ nonisolated final class AudioRecoveryJournal {
         var frames: Int = 0
     }
 
-    init(directory: URL) throws {
+    init(directory: URL, synchronize: @escaping (FileHandle) throws -> Void = RecordingFileSync.synchronize) throws {
         self.directory = directory
+        self.synchronize = synchronize
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data("""
         Interrupted recording recovery
@@ -25,7 +27,7 @@ nonisolated final class AudioRecoveryJournal {
         is its starting offset in seconds from the recording's first sample.
         Files ending in .partial.caf were open at interruption and may be incomplete.
         The adjacent -unprocessed.mov contains the original capture when readable.
-        These files are removed only after the final recording is installed successfully.
+        Originals and fragments are retained until you explicitly delete them.
         """.utf8).write(to: directory.appending(path: "README.txt"), options: .atomic)
     }
 
@@ -60,16 +62,28 @@ nonisolated final class AudioRecoveryJournal {
         }
     }
 
+    func checkpoint() throws {
+        for current in sources.values { try synchronize(current.file) }
+        try RecordingFileSync.synchronizeDirectory(directory)
+        try RecordingFileSync.synchronizeDirectory(directory.deletingLastPathComponent())
+    }
+
     func close() throws {
-        for source in Array(sources.keys) { try close(source) }
+        var failure: Error?
+        for source in Array(sources.keys) {
+            do { try close(source) } catch { failure = failure ?? error }
+        }
+        if let failure { throw failure }
     }
 
     private func close(_ source: String) throws {
-        guard let current = sources.removeValue(forKey: source) else { return }
-        defer { try? current.file.close() }
+        guard let current = sources[source] else { return }
         let finished = current.url.deletingPathExtension().deletingPathExtension().appendingPathExtension("caf")
+        try synchronize(current.file)
         try FileManager.default.moveItem(at: current.url, to: finished)
-        try RecordingFileSync.synchronize(current.file)
+        sources.removeValue(forKey: source)
+        try current.file.close()
+        try RecordingFileSync.synchronizeDirectory(directory)
     }
 
     /// CAF permits an unknown data-chunk size (-1). Unlike WAV, even the open

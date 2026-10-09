@@ -17,8 +17,6 @@ import os
 /// Service responsible for writing captured media to disk using AVAssetWriter
 nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable {
 
-    // MARK: - Properties
-
     private var assetWriter: AVAssetWriter?
     private var videoInput: AVAssetWriterInput?
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
@@ -48,6 +46,7 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
 
     // Track if we've received the first sample
     private var didCaptureSamples = false
+    private var didPersistSamples = false
     private var hasStartedSession = false
     private var sessionStartTime: CMTime = .zero
 
@@ -72,8 +71,6 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
     init(audioLevelMonitor: AudioLevelMonitor? = nil) {
         self.audioLevelMonitor = audioLevelMonitor
     }
-
-    // MARK: - Setup
 
     @MainActor private func prepareCapture(url: URL, directory: URL, fileType: AVFileType, settings: SettingsStore) throws -> URL {
         let captureURL = directory.appending(
@@ -174,7 +171,7 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
 
         outputURL = captureURL
         finalOutputURL = url
-        didCaptureSamples = false
+        didCaptureSamples = false; didPersistSamples = false
         hasStartedSession = false
         sessionStartTime = .zero
         lastVideoPresentationTime = .invalid
@@ -200,8 +197,6 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
             """
         )
     }
-
-    // MARK: - Writing
 
     /// Starts the writing session
     func startWriting() throws {
@@ -288,7 +283,7 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
             // Append using the pixel buffer adaptor
             if adaptor.append(pixelBuffer, withPresentationTime: presentationTime) {
                 lastVideoPresentationTime = presentationTime
-                frameCount += 1
+                frameCount += 1; markVideoPersisted()
                 if frameCount == 1 {
                     logger.info("First video frame appended successfully")
                 }
@@ -347,6 +342,10 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
         guard recoveryError == nil else { return }
         do {
             try recoveryJournal?.append(sample, source: source, origin: sessionStartTime)
+            if !didPersistSamples {
+                try recoveryJournal?.checkpoint()
+                didPersistSamples = true
+            }
         } catch {
             recoveryError = error
             logger.error("Audio recovery write failed: \(error.localizedDescription)")
@@ -381,8 +380,6 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
         }
         return 0
     }
-
-    // MARK: - Finalization
 
     /// Finishes writing and finalizes the output file
     /// - Returns: The output URL and the number of video frames written. A count of zero
@@ -468,7 +465,13 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
             // AVAssetWriter.cancelWriting deletes its configured destination.
             // Move an interrupted capture aside before cancelling the writer.
             let preservedURL = preserveCaptureBeforeCancellation()
-            assetWriter?.cancelWriting()
+            // If preserving the container failed, cancellation would delete it.
+            // Keep that writer alive until finalization instead of destroying captured data.
+            if !hasCapturedSamples || preservedURL != nil {
+                assetWriter?.cancelWriting()
+            } else if let writer = assetWriter {
+                PreservedWriter(writer).finish()
+            }
             if let preservedURL, let outputURL {
                 try? FileManager.default.moveItem(at: preservedURL, to: outputURL)
             }
@@ -503,22 +506,6 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
             logger.info("AssetWriter cancelled")
         }
     }
-
-    private func preserveCaptureBeforeCancellation() -> URL? {
-        guard didCaptureSamples, let outputURL,
-              FileManager.default.fileExists(atPath: outputURL.path) else { return nil }
-        let preserved = outputURL.deletingPathExtension()
-            .appendingPathExtension(UUID().uuidString + ".mov")
-        do {
-            try FileManager.default.moveItem(at: outputURL, to: preserved)
-            return preserved
-        } catch {
-            logger.error("Could not preserve interrupted container; audio recovery chunks remain: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    // MARK: - Settings Helpers
 
     @MainActor private func createVideoSettings(from settings: SettingsStore, size: CGSize) -> [String: Any] {
         var videoSettings: [String: Any] = [
@@ -649,8 +636,6 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
     }
 }
 
-// MARK: - CaptureEngineSampleBufferDelegate
-
 extension AssetWriter {
 
     private func completeWriter(url: URL) throws -> (url: URL, videoFrameCount: Int) {
@@ -720,11 +705,8 @@ extension AssetWriter {
         let handle = try FileHandle(forWritingTo: finalURL)
         try RecordingFileSync.synchronize(handle)
         try handle.close()
-        // Cleanup is best effort and happens only after the destination is durable.
-        try? FileManager.default.removeItem(at: result.url)
-        if let journal = recoveryJournal {
-            try? FileManager.default.removeItem(at: journal.directory)
-        }
+        try RecordingFileSync.synchronizeDirectory(finalURL.deletingLastPathComponent())
+        // Originals and independently playable recovery fragments stay until explicit deletion.
         recoveryJournal = nil
         finalOutputURL = nil
         return (finalURL, result.videoFrameCount)
@@ -749,33 +731,36 @@ extension AssetWriter {
     }
 }
 
-// MARK: - Errors
+extension AssetWriter {
+    var captureHealth: (ready: Bool, error: Error?) {
+        lock.withLockUnchecked { (didPersistSamples, recoveryError ?? assetWriter?.error) }
+    }
 
-nonisolated enum AssetWriterError: LocalizedError {
-    case failedToCreateWriter
-    case writerNotReady
-    case failedToStartWriting(Error?)
-    case writingFailed(Error?)
-    case noOutputURL
-    case noFramesWritten
-    case audioBuffersDropped(Int)
+    private func markVideoPersisted() {
+        // Audio sessions become ready through the independent PCM journal.
+        guard recoveryJournal == nil, !didPersistSamples, let outputURL else { return }
+        do {
+            guard (try FileManager.default.attributesOfItem(atPath: outputURL.path)[.size] as? NSNumber)?.intValue ?? 0 > 0 else { return }
+            let file = try FileHandle(forWritingTo: outputURL)
+            defer { try? file.close() }
+            try RecordingFileSync.synchronize(file)
+            try RecordingFileSync.synchronizeDirectory(outputURL.deletingLastPathComponent())
+            didPersistSamples = true
+        } catch { recoveryError = error }
+    }
 
-    var errorDescription: String? {
-        switch self {
-        case .failedToCreateWriter:
-            return "Failed to create the asset writer."
-        case .writerNotReady:
-            return "The asset writer is not ready for writing."
-        case .failedToStartWriting(let error):
-            return "Failed to start writing: \(error?.localizedDescription ?? "Unknown error")"
-        case .writingFailed(let error):
-            return "Writing failed: \(error?.localizedDescription ?? "Unknown error")"
-        case .noOutputURL:
-            return "No output URL was configured."
-        case .noFramesWritten:
-            return "No video frames were captured. Check screen recording permissions."
-        case .audioBuffersDropped(let count):
-            return "Audio capture could not keep up and dropped \(count) buffers; the partial lossless recording was preserved."
+    private func preserveCaptureBeforeCancellation() -> URL? {
+        guard didCaptureSamples, let outputURL,
+              FileManager.default.fileExists(atPath: outputURL.path) else { return nil }
+        let preserved = outputURL.deletingPathExtension()
+            .appendingPathExtension(UUID().uuidString + ".mov")
+        do {
+            try FileManager.default.moveItem(at: outputURL, to: preserved)
+            return preserved
+        } catch {
+            logger.error("Could not preserve interrupted container; audio recovery chunks remain: \(error.localizedDescription)")
+            return nil
         }
     }
+
 }

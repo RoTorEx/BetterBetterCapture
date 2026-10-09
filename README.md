@@ -122,3 +122,13 @@ Special thanks to these projects for their excellent work and inspiration:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Voxray calls and recovery
+
+Choose a call name and destination in the menu before recording, or keep it
+unassigned. Recording works when Voxray is unavailable. Final audio processing
+runs before the native handoff; transcript failure keeps the saved recording and
+offers retry. Originals and PCM fragments remain until explicit deletion.
+After interruption, use **Open original** or **Recover audio** in session history.
+See [integration and recovery](docs/VOXRAY_INTEGRATION.md) for ownership,
+contracts, required Voxray capabilities and verification limits.

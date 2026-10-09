@@ -19,22 +19,22 @@ final class RecorderViewModel {
 
     // MARK: - Published Properties
 
-    private(set) var state: RecordingState = .idle
-    private(set) var recordingDuration: TimeInterval = 0
-    private(set) var lastError: Error?
-    private(set) var selectedContentFilter: SCContentFilter?
+    var state: RecordingState = .idle
+    var recordingDuration: TimeInterval = 0
+    var lastError: Error?
+    var selectedContentFilter: SCContentFilter?
 
     /// The source rectangle for area selection (in display points, top-left origin)
     private(set) var selectedSourceRect: CGRect?
 
     /// The selected area in screen coordinates (bottom-left origin), used for the border frame overlay
-    private var selectedScreenRect: CGRect?
+    var selectedScreenRect: CGRect?
 
     /// The screen on which the area selection was made
     private var selectedScreen: NSScreen?
 
     /// Whether Presenter Overlay is currently active (camera composited into stream)
-    private(set) var isPresenterOverlayActive = false
+    var isPresenterOverlayActive = false
 
     // MARK: - Dependencies
 
@@ -45,22 +45,26 @@ final class RecorderViewModel {
     let notificationService: NotificationService
     let permissionService: PermissionService
     let audioLevelMonitor: AudioLevelMonitor
-    private let captureEngine: CaptureEngine
+    let captureEngine: CaptureEngine
+    let calls = CallWorkflow()
+    var captureSession: CaptureSession?
+    var healthMonitor: Task<Void, Never>?
+    var storageNotice: String?
     let recordingProcessor: RecordingProcessor
-    private var outputAccessURL: URL?
-    private var assetWriter: AssetWriter
-    private let cameraSession = CameraSession()
+    var outputAccessURL: URL?
+    var assetWriter: AssetWriter
+    let cameraSession = CameraSession()
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture", category: "RecorderViewModel")
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "BetterBetterCapture", category: "RecorderViewModel")
 
     // MARK: - Private Properties
 
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
-    private var videoSize: CGSize = .zero
+    var videoSize: CGSize = .zero
     private let areaSelectionOverlay = AreaSelectionOverlay()
-    private let selectionBorderFrame = SelectionBorderFrame()
-    private let recordingOverlay = RecordingOverlayCoordinator()
+    let selectionBorderFrame = SelectionBorderFrame()
+    let recordingOverlay = RecordingOverlayCoordinator()
 
     // MARK: - Initialization
 
@@ -201,165 +205,6 @@ final class RecorderViewModel {
         }
     }
 
-    private func releaseOutputAccess() {
-        outputAccessURL?.stopAccessingSecurityScopedResource()
-        outputAccessURL = nil
-    }
-
-    private func acquireOutputAccess() {
-        let directory = settings.outputDirectory
-        if directory.startAccessingSecurityScopedResource() { outputAccessURL = directory }
-    }
-
-    /// Starts a new recording session
-    func startRecording() async {
-        guard canStartRecording else {
-            logger.warning("Cannot start recording: no content selected or already recording")
-            return
-        }
-
-        // Dismiss the recording overlay if it's still visible
-        recordingOverlay.dismiss()
-
-        do {
-            // Auto-select the main display for audio-only recording so the user
-            // does not have to pick content manually. ScreenCaptureKit still
-            // requires a content filter even when only audio is captured.
-            if settings.recordAudioOnly && selectedContentFilter == nil {
-                let content = try await SCShareableContent.current
-
-                guard let display = content.displays.first else {
-                    throw CaptureError.noContentFilterSelected
-                }
-
-                let filter = SCContentFilter(display: display, excludingWindows: [])
-                selectedContentFilter = filter
-                try await captureEngine.updateFilter(filter)
-                logger.info("Auto-selected main display for audio-only recording")
-            }
-
-            state = .recording
-            lastError = nil
-
-            logger.info("Starting recording sequence...")
-
-            // Stop any active live preview before starting recording
-            logger.info("Stopping any active live preview...")
-            await previewService.stopPreview()
-            logger.info("Live preview stopped")
-
-            // Determine video size from filter
-            if let filter = selectedContentFilter {
-                videoSize = await getContentSize(from: filter)
-            }
-            logger.info("Video size: \(self.videoSize.width)x\(self.videoSize.height)")
-
-            // Access security-scoped output directory before writing
-            acquireOutputAccess()
-
-            // Setup asset writer
-            let outputURL = settings.generateOutputURL()
-            try assetWriter.setup(url: outputURL, settings: settings, videoSize: videoSize)
-            try assetWriter.startWriting()
-            logger.info("AssetWriter ready")
-
-            // Start camera for Presenter Overlay before capture so the system detects it
-            if settings.presenterOverlayEnabled {
-                await cameraSession.start(deviceID: settings.selectedCameraID)
-            }
-
-            // Start capture with the calculated video size
-            logger.info("Starting capture engine...")
-            try await captureEngine.startCapture(with: settings, videoSize: videoSize, sourceRect: selectedSourceRect)
-
-            // Re-show the area selection border now that capture has started
-            if isAreaSelection, let screenRect = selectedScreenRect {
-                selectionBorderFrame.show(screenRect: screenRect)
-            }
-
-            // Start timer
-            startTimer()
-
-            logger.info("Recording started")
-
-        } catch {
-            state = .idle
-            lastError = error
-            cameraSession.stop()
-            selectionBorderFrame.dismiss()
-
-            // The writer may already be set up and holding an empty output file. Cancel it
-            // before releasing the output directory, since that is where the file lives.
-            assetWriter.cancel()
-            releaseOutputAccess()
-
-            // lastError has no UI representation, so every start failure has to be surfaced
-            // as a notification - otherwise the record button silently does nothing.
-            notificationService.sendRecordingStartFailedNotification(error: error)
-
-            // The selection points at a display that is gone, so drop it. The next recording
-            // attempt then opens the picker instead of failing the same way again.
-            if error as? CaptureError == .selectedDisplayDisconnected {
-                await resetSelection()
-            }
-
-            logger.error("Failed to start recording: \(error.localizedDescription)")
-        }
-    }
-
-    /// Stops the current recording session
-    func stopRecording() async {
-        guard isRecording else { return }
-
-        state = .stopping
-        stopTimer()
-        selectionBorderFrame.dismiss()
-
-        do {
-            // Stop capture and camera session
-            try await captureEngine.stopCapture()
-            cameraSession.stop()
-            isPresenterOverlayActive = false
-            audioLevelMonitor.resetLevels()
-
-            let stoppedWriter = assetWriter
-            let stoppedAudioOnly = settings.recordAudioOnly
-            let accessURL = outputAccessURL
-            // Close and sync recovery audio before making capture controls available.
-            try stoppedWriter.checkpointRecovery()
-            outputAccessURL = nil
-            let filename = stoppedWriter.outputURL?.lastPathComponent ?? "Recording"
-            assetWriter = AssetWriter(audioLevelMonitor: audioLevelMonitor)
-            captureEngine.sampleBufferDelegate = assetWriter
-            recordingProcessor.enqueue(filename: filename) { [weak self] progress in
-                defer { accessURL?.stopAccessingSecurityScopedResource() }
-                do {
-                    let (url, frames) = try await stoppedWriter.finishWriting(progress: progress)
-                    guard let self else { return }
-                    if frames == 0 && !stoppedAudioOnly {
-                        self.notificationService.sendRecordingMissingVideoNotification(fileURL: url)
-                    } else {
-                        self.notificationService.sendRecordingSavedNotification(fileURL: url)
-                    }
-                } catch {
-                    stoppedWriter.cancel()
-                    self?.lastError = error
-                    self?.notificationService.sendRecordingFailedNotification(error: error)
-                }
-            }
-            state = .idle
-            recordingDuration = 0
-        } catch {
-            state = .idle
-            lastError = error
-            assetWriter.cancel()
-            audioLevelMonitor.resetLevels()
-            releaseOutputAccess()
-            notificationService.sendRecordingFailedNotification(error: error)
-            logger.error("Failed to stop recording: \(error.localizedDescription)")
-        }
-    }
-
     /// Resets the capture selection, removing the border frame and clearing state
     ///
     /// Covers both area and picker selections, so the capture engine's filter is cleared
@@ -389,7 +234,7 @@ final class RecorderViewModel {
 
     // MARK: - Timer Management
 
-    private func startTimer() {
+    func startTimer() {
         recordingStartTime = Date()
         recordingDuration = 0
 
@@ -401,7 +246,7 @@ final class RecorderViewModel {
         }
     }
 
-    private func stopTimer() {
+    func stopTimer() {
         recordingTimer?.invalidate()
         recordingTimer = nil
         recordingStartTime = nil

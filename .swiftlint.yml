@@ -1,6 +1,7 @@
 included:
   - BetterBetterCapture
   - BetterBetterCaptureTests
+  - VoxrayBridge
 
 excluded:
   - BetterBetterCapture.xcodeproj

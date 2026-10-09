@@ -129,7 +129,46 @@ extension AssetWriterTests {
             #expect(try await AVURLAsset(url: result.url).loadTracks(withMediaType: .audio).count == 1)
         }
         let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
-        #expect(files.sorted() == ["first.m4a", "second.m4a"])
+        #expect(Set(files) == Set([
+            "first.m4a", "second.m4a", "first-unprocessed.mov",
+            "second-unprocessed.mov", "first-recovery", "second-recovery"
+        ]))
+    }
+
+    @Test func syncFailureLeavesPlayableUncommittedFragment() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let journal = try AudioRecoveryJournal(directory: directory) { _ in
+            throw NSError(domain: NSPOSIXErrorDomain, code: 28)
+        }
+        try journal.append(makeNonInterleavedFloatAudioSampleBuffer(leftSample: 0.25, rightSample: 0.5),
+                           source: "system", origin: .zero)
+        #expect(throws: (any Error).self) { try journal.close() }
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let fragment = try #require(files.first { $0.pathExtension == "caf" })
+        #expect(fragment.lastPathComponent.contains("partial"))
+        #expect(try AVAudioFile(forReading: fragment).length == 4)
+    }
+
+    @Test func recoveredCopyRetainsBothSourcesAndOriginalFragments() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CaptureSessionStore(registry: directory.appending(path: "registry"))
+        let session = try store.begin(directory: directory, name: "Interrupted", profile: "")
+        let journal = try AudioRecoveryJournal(directory: session.directory.appending(path: "audio-recovery"))
+        for source in ["system", "microphone"] {
+            for _ in 0..<128 {
+                try journal.append(makeNonInterleavedFloatAudioSampleBuffer(leftSample: 0.1, rightSample: 0.2),
+                                   source: source, origin: .zero)
+            }
+        }
+        try journal.close()
+        let files = try FileManager.default.contentsOfDirectory(at: journal.directory, includingPropertiesForKeys: nil)
+        let before = try files.map { try Data(contentsOf: $0) }
+        let recovered = try await store.recover(session)
+        #expect(try await AVURLAsset(url: recovered).loadTracks(withMediaType: .audio).count == 1)
+        #expect(try await AVURLAsset(url: recovered).load(.duration).seconds > 0)
+        #expect(try files.map { try Data(contentsOf: $0) } == before)
     }
 
 }

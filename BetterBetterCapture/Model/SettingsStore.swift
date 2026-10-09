@@ -697,7 +697,7 @@ final class SettingsStore {
     }
 
     /// Security-scoped bookmark data for the custom output directory
-    private var customOutputDirectoryBookmark: Data? {
+    private(set) var customOutputDirectoryBookmark: Data? {
         get {
             access(keyPath: \.customOutputDirectoryBookmark)
             return defaults.data(forKey: "customOutputDirectoryBookmark")

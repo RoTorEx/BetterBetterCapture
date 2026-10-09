@@ -99,6 +99,7 @@ struct RecorderViewModelTests {
     @Test func everyRecordingStateRoutesToggleSafely() {
         let states = [
             RecordingStateExpectation(.idle, .start),
+            RecordingStateExpectation(.starting, .none),
             RecordingStateExpectation(.recording, .stop, isRecording: true),
             RecordingStateExpectation(.stopping, .none, isStopping: true)
         ]

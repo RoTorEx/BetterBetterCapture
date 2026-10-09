@@ -55,8 +55,20 @@ struct MenuBarView: View {
                     MenuBarDivider()
                 }
 
+                CallRecordingsView(calls: viewModel.calls, isBusy: isBusy)
+                    .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
+                if let error = viewModel.lastError {
+                    Text(error.localizedDescription)
+                        .font(.caption).foregroundStyle(.red).padding(12)
+                }
+                if let notice = viewModel.storageNotice {
+                    Text(notice).font(.caption).foregroundStyle(.orange).padding(12)
+                }
+
                 // Recording button (stop) or Start button
-                if viewModel.isStopping {
+                if viewModel.state == .starting {
+                    ProgressView("Starting capture…").padding(12)
+                } else if viewModel.isStopping {
                     VStack(alignment: .leading, spacing: 8) {
                         MenuBarActionButton(
                             title: "Stop Recording",
@@ -93,7 +105,7 @@ struct MenuBarView: View {
                     ) {
                         Task {
                             await viewModel.startRecording()
-                            dismiss()
+                            if viewModel.isRecording { dismiss() }
                         }
                     }
                     .padding(.horizontal, 12)

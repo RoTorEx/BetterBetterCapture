@@ -13,8 +13,9 @@
   background queue after stop. Final output contains one mixed audio track;
   video is remuxed without a second encode. Each capture has an independent
   writer, settings snapshot and output-directory access for its whole lifetime.
-- A visible `-unprocessed.mov` original remains until a processed copy is
-  installed and synchronized successfully. Failures never overwrite an existing
+- A visible `-unprocessed.mov` original remains until it is
+  explicitly deleted, including after a processed copy is synchronized. Failures
+  never overwrite an existing
   destination or intentionally delete captured samples. Output names remain
   unique when recordings start within the same second.
 - During capture, separate system/microphone lossless CAF fragments are written
@@ -31,10 +32,14 @@
   Synchronization requests hardware-cache flushing (`F_FULLFSYNC`) where the
   output volume supports it, with ordinary filesystem synchronization as the
   fallback for unsupported volumes. Real synchronization I/O errors fail visibly.
-- Recovery files survive cancellation and restart. They are removed only after
-  successful final output installation. Interrupted jobs are not automatically
-  resumed; the user can open their original or CAF fragments from the output
-  folder using the included recovery instructions.
+- Recovery files survive cancellation, successful processing and restart until
+  explicit deletion. Session history detects interrupted captures and can open
+  originals or reassemble audio fragments into a new copy without removing them.
+- Optional Voxray profile/name selection precedes capture. Unavailable integration
+  allows unassigned recording. Native XPC handoff happens only after the finalized
+  file is synchronized; transcription never controls capture or deletes originals.
+  Saved recording and ready transcript are separate visible states, with retry.
+  See [capture integration](../docs/VOXRAY_INTEGRATION.md).
 - Real-time audio writer backpressure uses a bounded FIFO. Overflow or a flush
   timeout fails explicitly instead of silently producing a recording with gaps.
 - Explicit content exclusion and local-only recording storage.

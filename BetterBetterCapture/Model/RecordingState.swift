@@ -8,6 +8,7 @@ extension RecorderViewModel {
 
     enum RecordingState: Equatable {
         case idle
+        case starting
         case recording
         case stopping
 
@@ -19,7 +20,7 @@ extension RecorderViewModel {
             switch self {
             case .idle: .start
             case .recording: .stop
-            case .stopping: .none
+            case .starting, .stopping: .none
             }
         }
 

@@ -6,6 +6,21 @@
 	objectVersion = 77;
 	objects = {
 
+        A10000000000000000000001 = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A10000000000000000000002,); path = VoxrayBridge; sourceTree = "<group>"; };
+        A10000000000000000000002 = {isa = PBXFileSystemSynchronizedBuildFileExceptionSet; membershipExceptions = (Info.plist,); target = A10000000000000000000003; };
+        A10000000000000000000003 = {isa = PBXNativeTarget; buildConfigurationList = A10000000000000000000004; buildPhases = (A10000000000000000000005,A10000000000000000000006,); buildRules = (); dependencies = (); fileSystemSynchronizedGroups = (A10000000000000000000001,); name = VoxrayBridge; productName = VoxrayBridge; productReference = A10000000000000000000007; productType = "com.apple.product-type.xpc-service"; };
+        A10000000000000000000004 = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000008,A10000000000000000000009,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        A10000000000000000000005 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        A10000000000000000000006 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        A10000000000000000000007 = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = VoxrayBridge.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
+        A10000000000000000000010 = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices"; dstSubfolderSpec = 16; files = (A10000000000000000000011,); name = "Embed Voxray Bridge"; runOnlyForDeploymentPostprocessing = 0; };
+        A10000000000000000000011 = {isa = PBXBuildFile; fileRef = A10000000000000000000007; settings = {ATTRIBUTES = (CodeSignOnCopy,RemoveHeadersOnCopy,); }; };
+        A10000000000000000000012 = {isa = PBXTargetDependency; target = A10000000000000000000003; targetProxy = A10000000000000000000013; };
+        A10000000000000000000013 = {isa = PBXContainerItemProxy; containerPortal = 6C0990A72F2BE0C100D48100; proxyType = 1; remoteGlobalIDString = A10000000000000000000003; remoteInfo = VoxrayBridge; };
+A10000000000000000000008 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; "CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development"; DEVELOPMENT_TEAM = B83VA8QTGU; ENABLE_APP_SANDBOX = NO; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = VoxrayBridge/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.betterbettercapture.app.voxraybridge; PRODUCT_NAME = VoxrayBridge; SWIFT_VERSION = 5.0; SKIP_INSTALL = YES;}; name = Debug; };
+A10000000000000000000009 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; "CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development"; DEVELOPMENT_TEAM = B83VA8QTGU; ENABLE_APP_SANDBOX = NO; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = VoxrayBridge/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.betterbettercapture.app.voxraybridge; PRODUCT_NAME = VoxrayBridge; SWIFT_VERSION = 5.0; SKIP_INSTALL = YES;}; name = Release; };
+
+
 /* Begin PBXBuildFile section */
 		6C5C123D2F3893FE0082CE23 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0990E12F2BE0C200D48100 /* Sparkle */; };
 		6C7AABCC2F783CC3006496CE /* BetterBetterCapture.xctestplan in Resources */ = {isa = PBXBuildFile; fileRef = 6C7AABCB2F783CC3006496CE /* BetterBetterCapture.xctestplan */; };
@@ -79,6 +94,7 @@
 			children = (
 				6C7AABCB2F783CC3006496CE /* BetterBetterCapture.xctestplan */,
 				6C0990B12F2BE0C100D48100 /* BetterBetterCapture */,
+                A10000000000000000000001,
 				6C7AABC32F783B98006496CE /* BetterBetterCaptureTests */,
 				6C0990B02F2BE0C100D48100 /* Products */,
 			);
@@ -88,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				6C0990AF2F2BE0C100D48100 /* BetterBetterCapture.app */,
+                A10000000000000000000007,
 				6C7AABC22F783B98006496CE /* BetterBetterCaptureTests.xctest */,
 			);
 			name = Products;
@@ -103,11 +120,11 @@
 				6C0990AB2F2BE0C100D48100 /* Sources */,
 				6C0990AC2F2BE0C100D48100 /* Frameworks */,
 				6C0990AD2F2BE0C100D48100 /* Resources */,
+                A10000000000000000000010,
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
+			dependencies = (A10000000000000000000012,);
 			fileSystemSynchronizedGroups = (
 				6C0990B12F2BE0C100D48100 /* BetterBetterCapture */,
 			);
@@ -180,6 +197,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+                A10000000000000000000003,
 				6C0990AE2F2BE0C100D48100 /* BetterBetterCapture */,
 				6C7AABC12F783B98006496CE /* BetterBetterCaptureTests */,
 			);

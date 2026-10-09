@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Added optional call name/profile selection and a native embedded XPC adapter
+  for durable Voxray jobs. Failed integration preserves recordings and supports retry.
+- Store captures in UUID folders with persistent history, interrupted-session
+  discovery and audio recovery into a new copy. Retain originals after success.
+- Distinguish capture startup from recording, surface disk errors, and fall back
+  to app-local recording storage when the configured folder is unavailable.
+
+
 - Added elapsed processing/waiting timers for individual recordings and a serial
   background processing queue. A new capture can start after the previous stream
   stops, without waiting for its audio processing.
