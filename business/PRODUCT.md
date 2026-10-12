@@ -76,6 +76,9 @@
   recording state.
 - Escape dismisses the main menu-bar panel, whether opened by clicking the
   menu-bar icon or by the Toggle Window shortcut, without stopping a recording.
+  Opening through the shortcut makes the existing panel key so keyboard commands
+  work immediately. Repeating the shortcut toggles the panel using the same
+  status button; closing with Escape preserves that toggle behavior.
 - The main menu-bar panel shows the installed marketing version as a quiet
   footer; the full version and build identifier remain available in Settings.
 - After capture shutdown and recovery checkpointing, Start Recording is available

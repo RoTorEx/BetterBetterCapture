@@ -51,13 +51,14 @@ struct MenuBarView: View {
         .frame(width: showsIntegrations ? 400 : 320, height: menuHeight)
         .scrollDisabled(menuContentHeight <= maximumMenuHeight)
         .background(.ultraThinMaterial)
+        .background(MenuBarPanelReader())
         .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
         .onDisappear { showsIntegrations = false }
         .onExitCommand {
             if showsIntegrations {
                 showsIntegrations = false
             } else {
-                dismiss()
+                MenuBarWindowController.dismiss()
             }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.settings.recordAudioOnly)
@@ -283,6 +284,12 @@ struct MenuBarView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 8)
                 .accessibilityLabel("Version \(appVersion)")
+        }
+        .background {
+            Button("Close menu") { MenuBarWindowController.dismiss() }
+                .keyboardShortcut(.cancelAction)
+                .hidden()
+                .accessibilityHidden(true)
         }
     }
 }

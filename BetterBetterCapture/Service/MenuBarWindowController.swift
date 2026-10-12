@@ -3,6 +3,23 @@ import AppKit
 /// Opens or closes the existing SwiftUI menu-bar panel through its status button.
 @MainActor
 enum MenuBarWindowController {
+    private static weak var panel: NSWindow?
+
+    static func attach(_ window: NSWindow) {
+        panel = window
+        DispatchQueue.main.async { focus() }
+    }
+
+    static func focus() {
+        guard let panel, panel.isVisible else { return }
+        panel.makeKey()
+    }
+
+    static func dismiss() {
+        guard panel?.isVisible == true else { return }
+        toggle()
+    }
+
     static func toggle() {
         // MenuBarExtra has no presentation binding. Use the app's status button
         // so SwiftUI retains ownership of panel positioning and dismissal.
@@ -10,6 +27,7 @@ enum MenuBarWindowController {
             if let contentView = window.contentView,
                let button = statusButton(in: contentView) {
                 button.performClick(nil)
+                DispatchQueue.main.async { focus() }
                 return
             }
         }

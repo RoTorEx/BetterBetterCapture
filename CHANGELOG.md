@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Focus the menu-bar panel when opened through Toggle Window so Escape closes
+  the main menu immediately and the shortcut continues to open/close it.
+
 - Label the Voxray integration with its installed CLI version and separate its
   settings from recording history in a dedicated block.
 
