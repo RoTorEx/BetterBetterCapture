@@ -9,7 +9,12 @@ never through a shell. Its allowlist is profiles, submit, status and run.
 No XPC operation can stop capture or delete an original.
 
 Before recording, the menu offers a name and a Voxray profile, including an
-unassigned local recording. Discovery failure never disables recording. Each
+unassigned local recording. The profile remains editable during capture in both
+recording modes. Stop freezes its current value before asynchronous shutdown
+and finalization; subsequent menu changes apply to later captures. Clearing the
+profile before Stop keeps that capture local, even if a profile is selected
+while it finalizes. Only an explicit later Process action may assign it again.
+Discovery failure never disables recording. Each
 capture gets its own UUID folder under the selected output directory, separate
 from the eventual call name. If that output folder cannot be created, capture
 falls back to the app's Application Support/Recordings and shows that path.
@@ -49,6 +54,12 @@ ready. Failed jobs remain saved and offer retry. Accepted jobs can retry from
 Voxray's snapshot even after its current config changes. Unassigned recordings
 can use the current menu name/profile when processing is requested later.
 Feedback remains an explicit separate Voxray command.
+
+The current native job contract always imports audio and transcribes it for an
+assigned profile. There is no import-only switch in BBC or this contract.
+Screen/video capture keeps the recorder's original video and its finalized copy;
+Voxray extracts audio for its call folder before transcription. The standalone
+Voxray CLI can import without transcription; it is a separate workflow.
 
 The XPC adapter bounds short requests at 30 seconds and processing at two hours
 plus shutdown margin. A client timeout, malformed response, unavailable binary,

@@ -35,7 +35,11 @@
 - Recovery files survive cancellation, successful processing and restart until
   explicit deletion. Session history detects interrupted captures and can open
   originals or reassemble audio fragments into a new copy without removing them.
-- Optional Voxray profile/name selection precedes capture. Unavailable integration
+- Optional Voxray name selection precedes capture. The profile can be selected,
+  changed or cleared before and during either audio-only or screen/video capture.
+  Stop freezes the selected profile before shutdown; changes for a later capture
+  cannot redirect queued recordings. An unassigned capture stays local unless
+  explicitly processed later. Unavailable integration
   allows unassigned recording. Native XPC handoff happens only after the finalized
   file is synchronized; transcription never controls capture or deletes originals.
   Saved recording and ready transcript are separate visible states, with retry.

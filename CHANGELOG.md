@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Allow profile changes during audio/video capture and freeze routing at Stop.
+  Keep unassigned captures local when another recording changes the menu profile.
+
 ## [2026.4.0] - 2026-10-10
 
 - Added optional call name/profile selection and a native embedded XPC adapter

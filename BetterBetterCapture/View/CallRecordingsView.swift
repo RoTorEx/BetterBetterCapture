@@ -4,6 +4,7 @@ import SwiftUI
 struct CallRecordingsView: View {
     @Bindable var calls: CallWorkflow
     let isBusy: Bool
+    let isStopping: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -13,7 +14,7 @@ struct CallRecordingsView: View {
                 Text("Unassigned — save locally").tag("")
                 ForEach(calls.profiles) { Text($0.id).tag($0.id) }
             }
-            .disabled(isBusy)
+            .disabled(isStopping)
             if calls.integrationError != nil {
                 Text("Voxray unavailable. Recording still works.")
                     .font(.caption).foregroundStyle(.secondary)

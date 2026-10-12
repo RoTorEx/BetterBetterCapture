@@ -26,11 +26,20 @@ import Observation
         }
     }
 
-    func process(_ original: CaptureSession) async {
+    /// Freeze routing when Stop is accepted, before capture shutdown or queued processing.
+    func finishCapture(_ original: CaptureSession) -> CaptureSession {
+        var session = original
+        session.profile = profile
+        session.state = "processing"
+        try? store.save(session)
+        return session
+    }
+
+    func process(_ original: CaptureSession, assignCurrentProfile: Bool = true) async {
         guard original.savedFile != nil, !activeJobs.contains(original.id) else { return }
         var session = original
         if session.profile.isEmpty {
-            guard !profile.isEmpty else { return }
+            guard assignCurrentProfile, !profile.isEmpty else { return }
             session.profile = profile
             session.name = name
         }

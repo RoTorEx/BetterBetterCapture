@@ -104,6 +104,8 @@ extension RecorderViewModel {
         guard isRecording else { return }
 
         state = .stopping
+        let stoppedSession = captureSession.map { calls.finishCapture($0) }
+        captureSession = stoppedSession
         healthMonitor?.cancel()
         healthMonitor = nil
         stopTimer()
@@ -116,12 +118,6 @@ extension RecorderViewModel {
             isPresenterOverlayActive = false
             audioLevelMonitor.resetLevels()
 
-            var stoppedSession = captureSession
-            if var session = stoppedSession {
-                session.state = "processing"
-                try? calls.store.save(session)
-                stoppedSession = session
-            }
             let stoppedWriter = assetWriter
             let stoppedAudioOnly = settings.recordAudioOnly
             let accessURL = outputAccessURL
@@ -240,7 +236,7 @@ extension RecorderViewModel {
                     session.state = "saved"
                     try? self.calls.store.save(session)
                     // Transcription never holds up capture or final audio processing.
-                    Task { await self.calls.process(session) }
+                    Task { await self.calls.process(session, assignCurrentProfile: false) }
                 }
                 if frames == 0 && !audioOnly {
                     self.notificationService.sendRecordingMissingVideoNotification(fileURL: url)

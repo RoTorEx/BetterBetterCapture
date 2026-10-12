@@ -55,7 +55,7 @@ struct MenuBarView: View {
                     MenuBarDivider()
                 }
 
-                CallRecordingsView(calls: viewModel.calls, isBusy: isBusy)
+                CallRecordingsView(calls: viewModel.calls, isBusy: isBusy, isStopping: viewModel.isStopping)
                     .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
                 if let error = viewModel.lastError {
                     Text(error.localizedDescription)

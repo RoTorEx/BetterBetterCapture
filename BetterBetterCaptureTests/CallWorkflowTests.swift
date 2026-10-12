@@ -3,6 +3,39 @@ import Testing
 @testable import BetterBetterCapture
 
 @MainActor struct CallWorkflowTests {
+    @Test(arguments: ["m4a", "mov"]) func profileAtStopSurvivesNextCapture(mediaExtension: String) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CaptureSessionStore(registry: directory.appending(path: "registry"))
+        let client = FailingVoxray()
+        client.fail = false
+        let workflow = CallWorkflow(store: store, client: client)
+        for initial in ["", "aveni"] {
+            let captured = try store.begin(directory: directory, name: "Daily", profile: initial)
+            workflow.profile = "thira"
+            var stopped = workflow.finishCapture(captured)
+            workflow.profile = "aveni" // Another capture starts while this one finalizes.
+            stopped.savedFile = stopped.directory.appending(path: "record." + mediaExtension)
+            stopped.state = "saved"
+            await workflow.process(stopped, assignCurrentProfile: false)
+            #expect(client.submitted.last?.profile == "thira")
+            #expect(client.submitted.last?.id == captured.id)
+            #expect(client.submitted.last?.name == "Daily")
+            let deselected = try store.begin(directory: directory, name: "Local", profile: "thira")
+            workflow.profile = "" // Removing assignment also takes effect at Stop.
+            var unassigned = workflow.finishCapture(deselected)
+            unassigned.savedFile = deselected.directory.appending(path: "record." + mediaExtension)
+            workflow.profile = "aveni"
+            let count = client.submitted.count
+            await workflow.process(unassigned, assignCurrentProfile: false)
+            #expect(client.submitted.count == count)
+            #expect(unassigned.profile.isEmpty)
+            await workflow.process(unassigned) // Explicit later processing may assign the current profile.
+            #expect(client.submitted.last?.profile == "aveni")
+            #expect(client.submitted.last?.id == deselected.id)
+        }
+    }
+
     @Test func integrationFailureKeepsSavedRecordingAndCanRetryAfterRestart() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -77,10 +110,12 @@ import Testing
 
 @MainActor private final class FailingVoxray: VoxrayServing {
     var fail = true
+    var submitted: [CaptureSession] = []
 
     func profiles() async throws -> [VoxrayProfile] { [] }
     func submit(_ session: CaptureSession) async throws -> VoxrayJob {
         if fail { throw NSError(domain: "integration", code: 1) }
+        submitted.append(session)
         return VoxrayJob(id: session.id.uuidString, stage: "ready", recording: "record.wav",
                          transcript: "transcript.txt", error: nil)
     }
