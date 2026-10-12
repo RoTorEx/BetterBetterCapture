@@ -37,7 +37,7 @@ struct BetterBetterCaptureApp: App {
             ScrollView {
                 CallRecordingsView(calls: viewModel.calls, isBusy: viewModel.isBusy, isStopping: viewModel.isStopping)
             }
-            .frame(width: 400, height: 480)
+            .frame(width: 440, height: 520)
             .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
         }
         .windowResizability(.contentSize)

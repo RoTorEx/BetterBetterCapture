@@ -38,6 +38,8 @@
 - The Integrations button beside Settings opens a separate window with call
   settings and recording history. It stays available during capture; Escape
   closes the window without stopping recording.
+- Each integration has its own labeled block. Voxray displays the installed CLI
+  version in parentheses; unavailable version discovery does not block capture.
 - Optional Voxray name selection precedes capture. The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
   Stop freezes the selected profile before shutdown; changes for a later capture

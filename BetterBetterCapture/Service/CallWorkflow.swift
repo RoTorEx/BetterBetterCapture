@@ -7,6 +7,7 @@ import Observation
     var profile = ""
     var transcribe = true
     private(set) var profiles: [VoxrayProfile] = []
+    private(set) var version: String?
     private(set) var integrationError: String?
     private(set) var activeJobs: Set<UUID> = []
     private let client: any VoxrayServing
@@ -17,6 +18,7 @@ import Observation
     }
 
     func refresh() async {
+        version = try? await client.version()
         do {
             profiles = try await client.profiles()
             integrationError = nil

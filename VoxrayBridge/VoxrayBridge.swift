@@ -48,14 +48,24 @@ final class VoxrayBridge: NSObject, VoxrayBridgeProtocol {
             throw NSError(domain: "VoxrayBridge", code: 3,
                           userInfo: [NSLocalizedDescriptionKey: "Voxray returned no valid response. Recording is saved."])
         }
+        if operation == "version" {
+            guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  object["status"] as? String == "ok", object["command"] as? String == "version",
+                  let version = object["result"] as? String, !version.isEmpty else {
+                throw NSError(domain: "VoxrayBridge", code: 3,
+                              userInfo: [NSLocalizedDescriptionKey: "Voxray version is unavailable."])
+            }
+            let envelope: [String: Any] = ["status": "ok", "contract_version": 1, "data": version]
+            return String(data: try JSONSerialization.data(withJSONObject: envelope), encoding: .utf8) ?? "{}"
+        }
         return response
     }
     private func prepare(_ operation: String, payload: String) throws -> ([String], URL?) {
         var arguments: [String]
         var requestFile: URL?
         switch operation {
-        case "profiles":
-            arguments = ["profiles"]
+        case "profiles", "version":
+            arguments = [operation]
         case "submit":
             let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".json")
             requestFile = file

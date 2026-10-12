@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Label the Voxray integration with its installed CLI version and separate its
+  settings from recording history in a dedicated block.
+
 - Move call settings and recording history to a separate Integrations window,
   opened beside Settings and available during recording.
 

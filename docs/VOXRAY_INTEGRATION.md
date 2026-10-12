@@ -5,10 +5,13 @@ writer, source containers, lossless system/microphone CAF fragments, serial
 final-audio processing, and session history. The nonsandboxed, Apple
 Development-signed embedded XPC service owns only a fixed adapter to
 `~/.x-cli-voxray/bin/voxray`. It launches programs directly with arguments,
-never through a shell. Its allowlist is profiles, submit, status and run.
+never through a shell. Its allowlist is version, profiles, submit, status and run.
+The version adapter reads the CLI's existing JSON version command and normalizes
+it into the bridge envelope. The UI labels the Voxray block with that installed
+version; failure to discover it does not prevent profile loading or capture.
 No XPC operation can stop capture or delete an original.
 
-Before recording, the menu offers a name and a Voxray profile, including an
+The Integrations window offers a name and a Voxray profile, including an
 unassigned local recording. The profile remains editable during capture in both
 recording modes. Stop freezes its current value before asynchronous shutdown
 and finalization; subsequent menu changes apply to later captures. Clearing the

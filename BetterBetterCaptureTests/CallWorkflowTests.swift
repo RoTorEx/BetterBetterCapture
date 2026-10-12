@@ -3,6 +3,18 @@ import Testing
 @testable import BetterBetterCapture
 
 @MainActor struct CallWorkflowTests {
+    @Test(arguments: [false, true]) func versionDiscoveryDoesNotBlockProfiles(unavailable: Bool) async {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = FailingVoxray()
+        client.versionUnavailable = unavailable
+        let workflow = CallWorkflow(store: CaptureSessionStore(registry: directory), client: client)
+        await workflow.refresh()
+        #expect(workflow.version == (unavailable ? nil : "0.5.1"))
+        #expect(workflow.profiles.map(\.id) == ["aveni"])
+        #expect(workflow.integrationError == nil)
+    }
+
     @Test(arguments: [false, true]) func transcriptionChoiceIsFrozenAtStop(enabled: Bool) async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -138,9 +150,14 @@ import Testing
 
 @MainActor private final class FailingVoxray: VoxrayServing {
     var fail = true
+    var versionUnavailable = false
     var submitted: [CaptureSession] = []
 
-    func profiles() async throws -> [VoxrayProfile] { [] }
+    func profiles() async throws -> [VoxrayProfile] { [VoxrayProfile(id: "aveni", callsDir: "/tmp/aveni")] }
+    func version() async throws -> String {
+        if versionUnavailable { throw NSError(domain: "version", code: 1) }
+        return "0.5.1"
+    }
     func submit(_ session: CaptureSession) async throws -> VoxrayJob {
         if fail { throw NSError(domain: "integration", code: 1) }
         submitted.append(session)

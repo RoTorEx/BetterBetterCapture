@@ -3,6 +3,10 @@ import Foundation
 /// An integration failure returns to the UI; it cannot control the capture writer.
 
 @MainActor final class VoxrayClient: VoxrayServing {
+    func version() async throws -> String {
+        try await request("version", payload: "")
+    }
+
     func profiles() async throws -> [VoxrayProfile] {
         try await request("profiles", payload: "")
     }
