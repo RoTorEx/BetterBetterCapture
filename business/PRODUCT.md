@@ -35,9 +35,11 @@
 - Recovery files survive cancellation, successful processing and restart until
   explicit deletion. Session history detects interrupted captures and can open
   originals or reassemble audio fragments into a new copy without removing them.
-- The Integrations button beside Settings opens a separate window with call
-  settings and recording history. It stays available during capture; Escape
-  closes the window without stopping recording.
+- The Integrations button beside Settings opens call settings and recording
+  history inside the existing menu-bar panel, with the same material and scrolling.
+  It does not activate a separate application window or change Spaces. Back or
+  Escape returns to the main menu; reopening the panel starts at the main menu.
+  Integration settings stay available during capture.
 - Each integration has its own labeled block. Voxray displays the installed CLI
   version in parentheses; unavailable version discovery does not block capture.
 - Optional Voxray name selection precedes capture. The profile can be selected,

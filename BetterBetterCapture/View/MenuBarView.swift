@@ -12,8 +12,8 @@ import ScreenCaptureKit
 struct MenuBarView: View {
     @Bindable var viewModel: RecorderViewModel
     @Environment(\.openSettings) private var openSettings
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    @State private var showsIntegrations = false
     @State private var currentPreview: NSImage?
     @State private var menuContentHeight: CGFloat = 320
 
@@ -36,206 +36,11 @@ struct MenuBarView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Permission status banner (only when idle)
-                if !isBusy,
-                   viewModel.permissionService.screenRecordingState != .granted ||
-                    (viewModel.settings.captureMicrophone && viewModel.permissionService.microphoneState != .granted) {
-                    PermissionStatusBanner(
-                        permissionService: viewModel.permissionService,
-                        showMicrophonePermission: viewModel.settings.captureMicrophone
-                    )
-                    MenuBarDivider()
-                }
-
-                // Warning when audio-only mode is active but microphone capture is off.
-                // Without this the user would record only the remote side of calls.
-                if !isBusy,
-                   viewModel.settings.recordAudioOnly,
-                   !viewModel.settings.captureMicrophone {
-                    MicrophoneDisabledWarning()
-                    MenuBarDivider()
-                }
-
-                if let error = viewModel.lastError {
-                    Text(error.localizedDescription)
-                        .font(.caption).foregroundStyle(.red).padding(12)
-                }
-                if let notice = viewModel.storageNotice {
-                    Text(notice).font(.caption).foregroundStyle(.orange).padding(12)
-                }
-
-                // Recording button (stop) or Start button
-                if viewModel.state == .starting {
-                    ProgressView("Starting capture…").padding(12)
-                } else if viewModel.isStopping {
-                    VStack(alignment: .leading, spacing: 8) {
-                        MenuBarActionButton(
-                            title: "Stop Recording",
-                            systemImage: "stop.circle",
-                            accentColor: .red,
-                            isDisabled: true,
-                            isProminent: true
-                        ) {}
-                        ProgressView("Stopping recording…")
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                } else if isRecording {
-                    MenuBarActionButton(
-                        title: "Stop Recording",
-                        systemImage: "stop.circle",
-                        accentColor: .red,
-                        isProminent: true,
-                        trailingLabel: viewModel.formattedDuration
-                    ) {
-                        Task {
-                            await viewModel.stopRecording()
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                if showsIntegrations {
+                    integrationsMenu
                 } else {
-                    MenuBarActionButton(
-                        title: "Start Recording",
-                        systemImage: "record.circle",
-                        accentColor: .green,
-                        isDisabled: !viewModel.canStartRecording,
-                        isProminent: true
-                    ) {
-                        Task {
-                            await viewModel.startRecording()
-                            if viewModel.isRecording { dismiss() }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-
-                    // Recording mode selector (audio-only vs screen + audio)
-                    RecordingModeSelector(settings: viewModel.settings)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 6)
-                        .disabled(isBusy)
+                    mainMenu
                 }
-
-                ProcessingRecordingsView(processor: viewModel.recordingProcessor)
-
-                // Content Selection (only relevant for screen + audio mode)
-                if !viewModel.settings.recordAudioOnly {
-                    VStack(spacing: 0) {
-                        MenuBarDivider()
-
-                        ContentSelectionButton(viewModel: viewModel) { dismiss() }
-                            .disabled(isBusy)
-
-                        // Preview thumbnail (hidden in audio-only mode since the auto-selected display is not relevant)
-                        if viewModel.hasContentSelected {
-                            PreviewThumbnailView(
-                                previewImage: currentPreview,
-                                isLivePreviewActive: viewModel.previewService.isCapturing,
-                                onStartLivePreview: {
-                                    Task {
-                                        await viewModel.startPreview()
-                                    }
-                                },
-                                onStopLivePreview: {
-                                    Task {
-                                        await viewModel.stopPreview()
-                                    }
-                                }
-                            )
-                            .onChange(of: viewModel.previewService.previewImage) { _, newImage in
-                                currentPreview = newImage
-                            }
-                            .onAppear {
-                                currentPreview = viewModel.previewService.previewImage
-                            }
-
-                            Button {
-                                Task {
-                                    await viewModel.resetSelection()
-                                }
-                            } label: {
-                                Text("Reset Selection")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.red)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 6)
-                                    .background(.gray.opacity(0.15), in: .rect(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 12)
-                            .disabled(isBusy)
-                        }
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                // Live audio level meter — kept outside the disabled group so it updates during recording
-                if viewModel.settings.captureSystemAudio || viewModel.settings.captureMicrophone {
-                    MenuBarDivider()
-
-                    AudioLevelMeterView(
-                        outputLevel: viewModel.audioLevelMonitor.systemAudioLevel,
-                        inputLevel: viewModel.audioLevelMonitor.microphoneLevel,
-                        outputDeviceName: { viewModel.systemAudioDeviceName },
-                        inputDeviceName: { viewModel.microphoneDeviceName },
-                        outputVolume: { AudioLevelMonitor.defaultOutputVolume() },
-                        inputVolume: { AudioLevelMonitor.defaultInputVolume() },
-                        showOutput: viewModel.settings.captureSystemAudio,
-                        showInput: viewModel.settings.captureMicrophone
-                    )
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .animation(.easeInOut(duration: 0.2), value: viewModel.settings.captureSystemAudio || viewModel.settings.captureMicrophone)
-                }
-
-                MenuBarDivider()
-
-                // Bottom Actions
-                MenuBarActionButton(title: "Open Output Folder", systemImage: "folder") {
-                    let settings = viewModel.settings
-                    let didStart = settings.startAccessingOutputDirectory()
-                    defer {
-                        if didStart {
-                            settings.stopAccessingOutputDirectory()
-                        }
-                    }
-
-                    let directory = settings.outputDirectory
-                    try? FileManager.default.createDirectory(
-                        at: directory,
-                        withIntermediateDirectories: true
-                    )
-
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: directory.path)
-                }
-
-                MenuBarActionButton(title: "Integrations", systemImage: "puzzlepiece.extension") {
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                    openWindow(id: "integrations")
-                    dismiss()
-                }
-
-                MenuBarActionButton(title: "Settings...", systemImage: "gear") {
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                    openSettings()
-                }
-
-                MenuBarActionButton(
-                    title: "Quit...", systemImage: "power", isDisabled: isBusy
-                ) {
-                    NSApplication.shared.terminate(nil)
-                }
-                .padding(.bottom, 2)
-
-                Text("v\(appVersion)")
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 8)
-                    .accessibilityLabel("Version \(appVersion)")
             }
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.height
@@ -243,12 +48,242 @@ struct MenuBarView: View {
                 menuContentHeight = newHeight
             }
         }
-        .frame(width: 320, height: menuHeight)
+        .frame(width: showsIntegrations ? 400 : 320, height: menuHeight)
         .scrollDisabled(menuContentHeight <= maximumMenuHeight)
         .background(.ultraThinMaterial)
         .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
-        .onExitCommand { dismiss() }
+        .onDisappear { showsIntegrations = false }
+        .onExitCommand {
+            if showsIntegrations {
+                showsIntegrations = false
+            } else {
+                dismiss()
+            }
+        }
         .animation(.easeInOut(duration: 0.25), value: viewModel.settings.recordAudioOnly)
+    }
+
+    private var integrationsMenu: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button {
+                    showsIntegrations = false
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                Spacer()
+                Text("Integrations").font(.headline)
+                Spacer()
+            }
+            .padding(12)
+            MenuBarDivider()
+            CallRecordingsView(calls: viewModel.calls, isBusy: isBusy, isStopping: viewModel.isStopping)
+        }
+    }
+
+    private var mainMenu: some View {
+        VStack(spacing: 0) {
+            // Permission status banner (only when idle)
+            if !isBusy,
+               viewModel.permissionService.screenRecordingState != .granted ||
+                (viewModel.settings.captureMicrophone && viewModel.permissionService.microphoneState != .granted) {
+                PermissionStatusBanner(
+                    permissionService: viewModel.permissionService,
+                    showMicrophonePermission: viewModel.settings.captureMicrophone
+                )
+                MenuBarDivider()
+            }
+
+            // Warning when audio-only mode is active but microphone capture is off.
+            // Without this the user would record only the remote side of calls.
+            if !isBusy,
+               viewModel.settings.recordAudioOnly,
+               !viewModel.settings.captureMicrophone {
+                MicrophoneDisabledWarning()
+                MenuBarDivider()
+            }
+
+            if let error = viewModel.lastError {
+                Text(error.localizedDescription)
+                    .font(.caption).foregroundStyle(.red).padding(12)
+            }
+            if let notice = viewModel.storageNotice {
+                Text(notice).font(.caption).foregroundStyle(.orange).padding(12)
+            }
+
+            // Recording button (stop) or Start button
+            if viewModel.state == .starting {
+                ProgressView("Starting capture…").padding(12)
+            } else if viewModel.isStopping {
+                VStack(alignment: .leading, spacing: 8) {
+                    MenuBarActionButton(
+                        title: "Stop Recording",
+                        systemImage: "stop.circle",
+                        accentColor: .red,
+                        isDisabled: true,
+                        isProminent: true
+                    ) {}
+                    ProgressView("Stopping recording…")
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+            } else if isRecording {
+                MenuBarActionButton(
+                    title: "Stop Recording",
+                    systemImage: "stop.circle",
+                    accentColor: .red,
+                    isProminent: true,
+                    trailingLabel: viewModel.formattedDuration
+                ) {
+                    Task {
+                        await viewModel.stopRecording()
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+            } else {
+                MenuBarActionButton(
+                    title: "Start Recording",
+                    systemImage: "record.circle",
+                    accentColor: .green,
+                    isDisabled: !viewModel.canStartRecording,
+                    isProminent: true
+                ) {
+                    Task {
+                        await viewModel.startRecording()
+                        if viewModel.isRecording { dismiss() }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
+                // Recording mode selector (audio-only vs screen + audio)
+                RecordingModeSelector(settings: viewModel.settings)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .disabled(isBusy)
+            }
+
+            ProcessingRecordingsView(processor: viewModel.recordingProcessor)
+
+            // Content Selection (only relevant for screen + audio mode)
+            if !viewModel.settings.recordAudioOnly {
+                VStack(spacing: 0) {
+                    MenuBarDivider()
+
+                    ContentSelectionButton(viewModel: viewModel) { dismiss() }
+                        .disabled(isBusy)
+
+                    // Preview thumbnail (hidden in audio-only mode since the auto-selected display is not relevant)
+                    if viewModel.hasContentSelected {
+                        PreviewThumbnailView(
+                            previewImage: currentPreview,
+                            isLivePreviewActive: viewModel.previewService.isCapturing,
+                            onStartLivePreview: {
+                                Task {
+                                    await viewModel.startPreview()
+                                }
+                            },
+                            onStopLivePreview: {
+                                Task {
+                                    await viewModel.stopPreview()
+                                }
+                            }
+                        )
+                        .onChange(of: viewModel.previewService.previewImage) { _, newImage in
+                            currentPreview = newImage
+                        }
+                        .onAppear {
+                            currentPreview = viewModel.previewService.previewImage
+                        }
+
+                        Button {
+                            Task {
+                                await viewModel.resetSelection()
+                            }
+                        } label: {
+                            Text("Reset Selection")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(.gray.opacity(0.15), in: .rect(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 12)
+                        .disabled(isBusy)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Live audio level meter — kept outside the disabled group so it updates during recording
+            if viewModel.settings.captureSystemAudio || viewModel.settings.captureMicrophone {
+                MenuBarDivider()
+
+                AudioLevelMeterView(
+                    outputLevel: viewModel.audioLevelMonitor.systemAudioLevel,
+                    inputLevel: viewModel.audioLevelMonitor.microphoneLevel,
+                    outputDeviceName: { viewModel.systemAudioDeviceName },
+                    inputDeviceName: { viewModel.microphoneDeviceName },
+                    outputVolume: { AudioLevelMonitor.defaultOutputVolume() },
+                    inputVolume: { AudioLevelMonitor.defaultInputVolume() },
+                    showOutput: viewModel.settings.captureSystemAudio,
+                    showInput: viewModel.settings.captureMicrophone
+                )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.easeInOut(duration: 0.2), value: viewModel.settings.captureSystemAudio || viewModel.settings.captureMicrophone)
+            }
+
+            MenuBarDivider()
+
+            // Bottom Actions
+            MenuBarActionButton(title: "Open Output Folder", systemImage: "folder") {
+                let settings = viewModel.settings
+                let didStart = settings.startAccessingOutputDirectory()
+                defer {
+                    if didStart {
+                        settings.stopAccessingOutputDirectory()
+                    }
+                }
+
+                let directory = settings.outputDirectory
+                try? FileManager.default.createDirectory(
+                    at: directory,
+                    withIntermediateDirectories: true
+                )
+
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: directory.path)
+            }
+
+            MenuBarActionButton(title: "Integrations", systemImage: "puzzlepiece.extension") {
+                showsIntegrations = true
+            }
+
+            MenuBarActionButton(title: "Settings...", systemImage: "gear") {
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openSettings()
+            }
+
+            MenuBarActionButton(
+                title: "Quit...", systemImage: "power", isDisabled: isBusy
+            ) {
+                NSApplication.shared.terminate(nil)
+            }
+            .padding(.bottom, 2)
+
+            Text("v\(appVersion)")
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 8)
+                .accessibilityLabel("Version \(appVersion)")
+        }
     }
 }
 
@@ -442,53 +477,6 @@ struct ContentSelectionButton: View {
                 await viewModel.presentAreaSelection()
             }
         }
-    }
-}
-
-// MARK: - Recording Mode Selector
-
-/// A two-segment selector shown under the Start Recording button.
-/// Switching to Audio mode enables audio-only capture and hides content selection.
-struct RecordingModeSelector: View {
-    @Bindable var settings: SettingsStore
-
-    private var mode: RecordingMode {
-        get {
-            settings.recordAudioOnly ? .audio : .screenAndAudio
-        }
-        nonmutating set {
-            settings.recordAudioOnly = (newValue == .audio)
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(RecordingMode.allCases) { recordingMode in
-                let isSelected = mode == recordingMode
-
-                Button {
-                    mode = recordingMode
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: recordingMode.icon)
-                            .font(.system(size: 12, weight: .medium))
-                        Text(recordingMode.label)
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .foregroundStyle(isSelected ? .white : .primary)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(isSelected ? Color.accentColor : .clear)
-                    )
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(2)
-        .background(.gray.opacity(0.15), in: .rect(cornerRadius: 8))
     }
 }
 

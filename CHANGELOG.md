@@ -5,8 +5,9 @@
 - Label the Voxray integration with its installed CLI version and separate its
   settings from recording history in a dedicated block.
 
-- Move call settings and recording history to a separate Integrations window,
-  opened beside Settings and available during recording.
+- Move call settings and recording history to an Integrations page in the
+  existing menu-bar panel. Back or Escape returns to capture controls without
+  activating a separate window or switching Spaces.
 
 ## [2026.4.1] - 2026-10-12
 

@@ -3,7 +3,6 @@ import SwiftUI
 
 struct CallRecordingsView: View {
     @Bindable var calls: CallWorkflow
-    @Environment(\.dismiss) private var dismiss
     let isBusy: Bool
     let isStopping: Bool
 
@@ -62,7 +61,6 @@ struct CallRecordingsView: View {
         }
         .padding(16)
         .task { await calls.refresh() }
-        .onExitCommand { dismiss() }
     }
 
     private func label(_ session: CaptureSession) -> String {

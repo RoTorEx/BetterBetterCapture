@@ -33,16 +33,6 @@ struct BetterBetterCaptureApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Integrations", id: "integrations") {
-            ScrollView {
-                CallRecordingsView(calls: viewModel.calls, isBusy: viewModel.isBusy, isStopping: viewModel.isStopping)
-            }
-            .frame(width: 440, height: 520)
-            .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
-        }
-        .windowResizability(.contentSize)
-        .defaultLaunchBehavior(.suppressed)
-
         // Settings window
         Settings {
             SettingsView(

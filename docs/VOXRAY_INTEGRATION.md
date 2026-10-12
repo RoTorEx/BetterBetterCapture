@@ -11,7 +11,7 @@ it into the bridge envelope. The UI labels the Voxray block with that installed
 version; failure to discover it does not prevent profile loading or capture.
 No XPC operation can stop capture or delete an original.
 
-The Integrations window offers a name and a Voxray profile, including an
+The Integrations page inside the menu-bar panel offers a name and a Voxray profile, including an
 unassigned local recording. The profile remains editable during capture in both
 recording modes. Stop freezes its current value before asynchronous shutdown
 and finalization; subsequent menu changes apply to later captures. Clearing the
