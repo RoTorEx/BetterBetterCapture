@@ -7,12 +7,14 @@ enum MenuBarWindowController {
 
     static func attach(_ window: NSWindow) {
         panel = window
+        (window as? NSPanel)?.becomesKeyOnlyIfNeeded = false
         DispatchQueue.main.async { focus() }
     }
 
     static func focus() {
         guard let panel, panel.isVisible else { return }
         panel.makeKey()
+        panel.makeFirstResponder(panel.contentView)
     }
 
     static func dismiss() {

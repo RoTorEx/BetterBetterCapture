@@ -51,16 +51,15 @@ struct MenuBarView: View {
         .frame(width: showsIntegrations ? 400 : 320, height: menuHeight)
         .scrollDisabled(menuContentHeight <= maximumMenuHeight)
         .background(.ultraThinMaterial)
-        .background(MenuBarPanelReader())
-        .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
-        .onDisappear { showsIntegrations = false }
-        .onExitCommand {
+        .background(MenuBarPanelReader {
             if showsIntegrations {
                 showsIntegrations = false
             } else {
                 MenuBarWindowController.dismiss()
             }
-        }
+        })
+        .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
+        .onDisappear { showsIntegrations = false }
         .animation(.easeInOut(duration: 0.25), value: viewModel.settings.recordAudioOnly)
     }
 
@@ -73,7 +72,6 @@ struct MenuBarView: View {
                     Label("Back", systemImage: "chevron.left")
                 }
                 .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
                 Spacer()
                 Text("Integrations").font(.headline)
                 Spacer()
@@ -82,6 +80,7 @@ struct MenuBarView: View {
             MenuBarDivider()
             CallRecordingsView(calls: viewModel.calls, isBusy: isBusy, isStopping: viewModel.isStopping)
         }
+        .onAppear { MenuBarWindowController.focus() }
     }
 
     private var mainMenu: some View {
@@ -284,12 +283,6 @@ struct MenuBarView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 8)
                 .accessibilityLabel("Version \(appVersion)")
-        }
-        .background {
-            Button("Close menu") { MenuBarWindowController.dismiss() }
-                .keyboardShortcut(.cancelAction)
-                .hidden()
-                .accessibilityHidden(true)
         }
     }
 }
