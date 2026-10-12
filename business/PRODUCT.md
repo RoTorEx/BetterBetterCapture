@@ -35,6 +35,9 @@
 - Recovery files survive cancellation, successful processing and restart until
   explicit deletion. Session history detects interrupted captures and can open
   originals or reassemble audio fragments into a new copy without removing them.
+- The Integrations button beside Settings opens a separate window with call
+  settings and recording history. It stays available during capture; Escape
+  closes the window without stopping recording.
 - Optional Voxray name selection precedes capture. The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
   Stop freezes the selected profile before shutdown; changes for a later capture

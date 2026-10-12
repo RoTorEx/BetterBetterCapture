@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Move call settings and recording history to a separate Integrations window,
+  opened beside Settings and available during recording.
+
 ## [2026.4.1] - 2026-10-12
 
 - Add a per-recording Transcript checkbox; clearing it files audio without

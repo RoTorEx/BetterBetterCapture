@@ -12,6 +12,7 @@ import ScreenCaptureKit
 struct MenuBarView: View {
     @Bindable var viewModel: RecorderViewModel
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
     @State private var currentPreview: NSImage?
     @State private var menuContentHeight: CGFloat = 320
@@ -55,8 +56,6 @@ struct MenuBarView: View {
                     MenuBarDivider()
                 }
 
-                CallRecordingsView(calls: viewModel.calls, isBusy: isBusy, isStopping: viewModel.isStopping)
-                    .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
                 if let error = viewModel.lastError {
                     Text(error.localizedDescription)
                         .font(.caption).foregroundStyle(.red).padding(12)
@@ -212,6 +211,12 @@ struct MenuBarView: View {
                     NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: directory.path)
                 }
 
+                MenuBarActionButton(title: "Integrations", systemImage: "puzzlepiece.extension") {
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    openWindow(id: "integrations")
+                    dismiss()
+                }
+
                 MenuBarActionButton(title: "Settings...", systemImage: "gear") {
                     NSApplication.shared.activate(ignoringOtherApps: true)
                     openSettings()
@@ -241,6 +246,7 @@ struct MenuBarView: View {
         .frame(width: 320, height: menuHeight)
         .scrollDisabled(menuContentHeight <= maximumMenuHeight)
         .background(.ultraThinMaterial)
+        .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
         .onExitCommand { dismiss() }
         .animation(.easeInOut(duration: 0.25), value: viewModel.settings.recordAudioOnly)
     }
