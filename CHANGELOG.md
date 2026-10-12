@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.4.1] - 2026-10-12
+
 - Add a per-recording Transcript checkbox; clearing it files audio without
   launching transcription. Freeze its value at Stop and retain it across retry.
 
