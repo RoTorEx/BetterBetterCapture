@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.4.2] - 2026-10-12
+
 - Focus the menu-bar panel when opened through Toggle Window so Escape closes
   the main menu immediately and the shortcut continues to open/close it.
 
