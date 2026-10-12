@@ -15,6 +15,8 @@ struct CallRecordingsView: View {
                 ForEach(calls.profiles) { Text($0.id).tag($0.id) }
             }
             .disabled(isStopping)
+            Toggle("Transcript", isOn: $calls.transcribe)
+                .toggleStyle(.checkbox).disabled(isStopping)
             if calls.integrationError != nil {
                 Text("Voxray unavailable. Recording still works.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -36,7 +38,7 @@ struct CallRecordingsView: View {
                             Button("Recover audio") { Task { await calls.recover(session) } }
                         } else if let transcript = session.transcript {
                             Button("Transcript") { NSWorkspace.shared.open(transcript) }
-                        } else if session.savedFile != nil {
+                        } else if session.savedFile != nil && session.state != "filed" {
                             Button(session.profile.isEmpty ? "Process" : "Retry") {
                                 Task { await calls.process(session) }
                             }
@@ -55,6 +57,7 @@ struct CallRecordingsView: View {
     private func label(_ session: CaptureSession) -> String {
         switch session.state {
         case "ready": "Recording saved · Transcript ready"
+        case "filed": "Recording saved · Filed without transcript"
         case "saved": "Recording saved"
         case "transcribing": "Recording saved · Transcribing…"
         case "processing": "Original captured · Processing audio…"

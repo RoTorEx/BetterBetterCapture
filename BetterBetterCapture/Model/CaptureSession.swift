@@ -11,4 +11,6 @@ nonisolated struct CaptureSession: Codable, Identifiable, Sendable {
     var savedFile: URL?
     var transcript: URL?
     var error: String?
+    /// Optional for decoding sessions created before this per-recording choice.
+    var transcribe: Bool?
 }

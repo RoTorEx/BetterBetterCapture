@@ -43,6 +43,10 @@
   allows unassigned recording. Native XPC handoff happens only after the finalized
   file is synchronized; transcription never controls capture or deletes originals.
   Saved recording and ready transcript are separate visible states, with retry.
+  A per-recording Transcript checkbox selects whether the assigned recording
+  is only filed as audio or also transcribed. It is enabled by default for
+  compatibility, editable before/during capture, and frozen alongside the
+  profile at Stop. Profiles do not enable transcription themselves.
   See [capture integration](../docs/VOXRAY_INTEGRATION.md).
 - Real-time audio writer backpressure uses a bounded FIFO. Overflow or a flush
   timeout fails explicitly instead of silently producing a recording with gaps.

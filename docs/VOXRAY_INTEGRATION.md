@@ -14,6 +14,9 @@ recording modes. Stop freezes its current value before asynchronous shutdown
 and finalization; subsequent menu changes apply to later captures. Clearing the
 profile before Stop keeps that capture local, even if a profile is selected
 while it finalizes. Only an explicit later Process action may assign it again.
+The Transcript checkbox is also editable before/during capture and frozen at
+Stop. It defaults to enabled to preserve existing behavior and is saved with
+the session; later menu changes cannot alter queued work or accepted retries.
 Discovery failure never disables recording. Each
 capture gets its own UUID folder under the selected output directory, separate
 from the eventual call name. If that output folder cannot be created, capture
@@ -55,10 +58,11 @@ Voxray's snapshot even after its current config changes. Unassigned recordings
 can use the current menu name/profile when processing is requested later.
 Feedback remains an explicit separate Voxray command.
 
-The current native job contract always imports audio and transcribes it for an
-assigned profile. There is no import-only switch in BBC or this contract.
+For an assigned profile, the Transcript checkbox chooses import-only or import
+plus transcription. Import-only completes with the `stored` job stage and a
+"Filed without transcript" history label. It never invokes MacWhisper.
 Screen/video capture keeps the recorder's original video and its finalized copy;
-Voxray extracts audio for its call folder before transcription. The standalone
+Voxray extracts audio for its call folder, then transcribes only when requested. The standalone
 Voxray CLI can import without transcription; it is a separate workflow.
 
 The XPC adapter bounds short requests at 30 seconds and processing at two hours

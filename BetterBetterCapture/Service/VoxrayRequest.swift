@@ -6,11 +6,12 @@ nonisolated struct VoxrayRequest: Encodable {
     let recordedAt: String
     let profile: String
     let name: String
+    let transcribe: Bool
 
     enum CodingKeys: String, CodingKey {
         case recordingId = "recording_id"
         case recording
         case recordedAt = "recorded_at"
-        case profile, name
+        case profile, name, transcribe
     }
 }

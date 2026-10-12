@@ -5,6 +5,7 @@ import Observation
     let store: CaptureSessionStore
     var name = ""
     var profile = ""
+    var transcribe = true
     private(set) var profiles: [VoxrayProfile] = []
     private(set) var integrationError: String?
     private(set) var activeJobs: Set<UUID> = []
@@ -30,6 +31,7 @@ import Observation
     func finishCapture(_ original: CaptureSession) -> CaptureSession {
         var session = original
         session.profile = profile
+        session.transcribe = transcribe
         session.state = "processing"
         try? store.save(session)
         return session
@@ -42,6 +44,7 @@ import Observation
             guard assignCurrentProfile, !profile.isEmpty else { return }
             session.profile = profile
             session.name = name
+            session.transcribe = transcribe
         }
         activeJobs.insert(session.id)
         defer { activeJobs.remove(session.id) }
@@ -55,8 +58,13 @@ import Observation
             } else {
                 submitted = try await client.submit(session)
             }
-            let result = submitted.stage == "ready" ? submitted : try await client.run(session.id)
-            session.state = result.stage == "ready" ? "ready" : "saved"
+            let complete = ["ready", "stored"].contains(submitted.stage)
+            let result = complete ? submitted : try await client.run(session.id)
+            switch result.stage {
+            case "ready": session.state = "ready"
+            case "stored": session.state = "filed"
+            default: session.state = "saved"
+            }
             session.error = result.error
             if result.stage == "ready" { session.transcript = URL(fileURLWithPath: result.transcript) }
             try store.save(session)

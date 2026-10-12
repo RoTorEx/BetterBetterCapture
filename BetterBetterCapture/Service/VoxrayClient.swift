@@ -14,7 +14,8 @@ import Foundation
         let input = VoxrayRequest(
             recordingId: session.id.uuidString, recording: recording.path,
             recordedAt: formatter.string(from: session.startedAt), profile: session.profile,
-            name: session.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Call" : session.name)
+            name: session.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Call" : session.name,
+            transcribe: session.transcribe ?? true)
         let payload = String(data: try JSONEncoder().encode(input), encoding: .utf8) ?? ""
         return try await request("submit", payload: payload)
     }

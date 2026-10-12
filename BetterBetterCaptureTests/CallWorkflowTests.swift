@@ -3,6 +3,34 @@ import Testing
 @testable import BetterBetterCapture
 
 @MainActor struct CallWorkflowTests {
+    @Test(arguments: [false, true]) func transcriptionChoiceIsFrozenAtStop(enabled: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CaptureSessionStore(registry: directory.appending(path: "registry"))
+        let client = FailingVoxray()
+        client.fail = false
+        let workflow = CallWorkflow(store: store, client: client)
+        workflow.profile = "aveni"
+        workflow.transcribe = enabled
+        let capture = try store.begin(directory: directory, name: "Daily", profile: "aveni")
+        var stopped = workflow.finishCapture(capture)
+        workflow.transcribe = !enabled
+        stopped.savedFile = stopped.directory.appending(path: "record.m4a")
+        await workflow.process(stopped, assignCurrentProfile: false)
+        #expect(client.submitted.last?.transcribe == enabled)
+        #expect(store.sessions.first?.state == (enabled ? "ready" : "filed"))
+        #expect((store.sessions.first?.transcript != nil) == enabled)
+    }
+
+    @Test func oldSessionStillDecodesWithDefaultTranscription() throws {
+        let capture = CaptureSession(id: UUID(), startedAt: Date(), directory: URL(filePath: "/tmp"),
+                                     name: "Legacy", profile: "aveni", state: "saved")
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(capture)) as? [String: Any])
+        object.removeValue(forKey: "transcribe")
+        let decoded = try JSONDecoder().decode(CaptureSession.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(decoded.transcribe == nil)
+    }
+
     @Test(arguments: ["m4a", "mov"]) func profileAtStopSurvivesNextCapture(mediaExtension: String) async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -116,7 +144,7 @@ import Testing
     func submit(_ session: CaptureSession) async throws -> VoxrayJob {
         if fail { throw NSError(domain: "integration", code: 1) }
         submitted.append(session)
-        return VoxrayJob(id: session.id.uuidString, stage: "ready", recording: "record.wav",
+        return VoxrayJob(id: session.id.uuidString, stage: session.transcribe == false ? "stored" : "ready", recording: "record.wav",
                          transcript: "transcript.txt", error: nil)
     }
     func run(_ id: UUID) async throws -> VoxrayJob { throw NSError(domain: "unused", code: 1) }

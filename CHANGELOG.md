@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add a per-recording Transcript checkbox; clearing it files audio without
+  launching transcription. Freeze its value at Stop and retain it across retry.
+
 - Allow profile changes during audio/video capture and freeze routing at Stop.
   Keep unassigned captures local when another recording changes the menu profile.
 
