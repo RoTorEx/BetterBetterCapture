@@ -22,7 +22,8 @@ video copy to the Voxray call folder while retaining canonical audio for
 transcription. It never deletes BBC originals. The Transcript checkbox is also editable before/during capture and frozen at
 Stop. It defaults to enabled to preserve existing behavior and is saved with
 the session; later menu changes cannot alter queued work or accepted retries.
-Discovery failure never disables recording. Each
+Profile discovery follows TOML declaration order, with default first; the UI
+keeps that sequence and places Unassigned before it. Discovery failure never disables recording. Each
 capture gets its own UUID folder under the selected output directory, separate
 from the eventual call name. If that output folder cannot be created, capture
 falls back to the app's Application Support/Recordings and shows that path.

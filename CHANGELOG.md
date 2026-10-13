@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Keep Voxray profiles in configuration order, with Unassigned first.
+
 - Remove recording history and per-recording actions from Integrations, leaving
   only Voxray settings while preserving recordings and session metadata.
 

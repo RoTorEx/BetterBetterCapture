@@ -39,7 +39,9 @@
   inside the existing menu-bar panel, with the same material and scrolling.
   It does not activate a separate application window or change Spaces. Back or
   Escape returns to the main menu; reopening the panel starts at the main menu.
-  Integration settings stay available during capture.
+  Integration settings stay available during capture. Destination keeps the
+  profile order returned by Voxray, matching TOML declaration order; the
+  unassigned local destination stays first.
 - Each integration has its own labeled block. Voxray displays the installed CLI
   version in parentheses; unavailable version discovery does not block capture.
 - Voxray call name, profile, Transcript and Keep video remain editable during
