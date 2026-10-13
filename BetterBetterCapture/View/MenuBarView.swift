@@ -60,7 +60,6 @@ struct MenuBarView: View {
         })
         .onAppear { viewModel.calls.store.discover(in: viewModel.settings.outputDirectory) }
         .onDisappear { showsIntegrations = false }
-        .animation(.easeInOut(duration: 0.25), value: viewModel.settings.recordAudioOnly)
     }
 
     private var integrationsMenu: some View {
@@ -78,7 +77,8 @@ struct MenuBarView: View {
             }
             .padding(12)
             MenuBarDivider()
-            CallRecordingsView(calls: viewModel.calls, isBusy: isBusy, isStopping: viewModel.isStopping)
+            CallRecordingsView(calls: viewModel.calls, isAudioOnly: viewModel.settings.recordAudioOnly,
+                               isStopping: viewModel.isStopping)
         }
         .onAppear { MenuBarWindowController.focus() }
     }
@@ -216,7 +216,6 @@ struct MenuBarView: View {
                         .disabled(isBusy)
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             // Live audio level meter — kept outside the disabled group so it updates during recording

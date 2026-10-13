@@ -46,6 +46,9 @@
   capture and freeze together when Stop is accepted. Keep video defaults off:
   video captures file canonical audio, with an additional video copy in the call
   folder only when checked. Recorder originals are always retained.
+  Keep video and its explanation appear only in Screen + Audio mode, including
+  during capture. Audio mode has no video retention control. Switching modes
+  updates menu layout without animating the entire panel or sliding its blocks.
   The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
   Stop freezes the selected profile before shutdown; changes for a later capture

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Show Keep video only for video capture and remove panel-wide mode-switch
+  animation so mode changes do not slide menu sections through resizing.
+
 - Allow editing call names during capture and freeze the final name at Stop.
 - Add Keep video to file video alongside audio in Voxray call folders.
 - Reconcile saved history entries with completed Voxray jobs on refresh.

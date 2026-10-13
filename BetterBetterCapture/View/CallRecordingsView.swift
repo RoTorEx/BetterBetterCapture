@@ -3,7 +3,7 @@ import SwiftUI
 
 struct CallRecordingsView: View {
     @Bindable var calls: CallWorkflow
-    let isBusy: Bool
+    let isAudioOnly: Bool
     let isStopping: Bool
 
     var body: some View {
@@ -18,10 +18,12 @@ struct CallRecordingsView: View {
                 .disabled(isStopping)
                 Toggle("Transcript", isOn: $calls.transcribe)
                     .toggleStyle(.checkbox).disabled(isStopping)
-                Toggle("Keep video", isOn: $calls.keepVideo)
-                    .toggleStyle(.checkbox).disabled(isStopping)
-                Text("Video captures always file audio; enable to also keep video in the call folder.")
-                    .font(.caption).foregroundStyle(.secondary)
+                if !isAudioOnly {
+                    Toggle("Keep video", isOn: $calls.keepVideo)
+                        .toggleStyle(.checkbox).disabled(isStopping)
+                    Text("Video captures always file audio; enable to also keep video in the call folder.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if calls.integrationError != nil {
                     Text("Voxray unavailable. Recording still works.")
                         .font(.caption).foregroundStyle(.secondary)
