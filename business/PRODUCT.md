@@ -42,7 +42,11 @@
   Integration settings stay available during capture.
 - Each integration has its own labeled block. Voxray displays the installed CLI
   version in parentheses; unavailable version discovery does not block capture.
-- Optional Voxray name selection precedes capture. The profile can be selected,
+- Voxray call name, profile, Transcript and Keep video remain editable during
+  capture and freeze together when Stop is accepted. Keep video defaults off:
+  video captures file canonical audio, with an additional video copy in the call
+  folder only when checked. Recorder originals are always retained.
+  The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
   Stop freezes the selected profile before shutdown; changes for a later capture
   cannot redirect queued recordings. An unassigned capture stays local unless

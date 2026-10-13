@@ -13,4 +13,5 @@ nonisolated struct CaptureSession: Codable, Identifiable, Sendable {
     var error: String?
     /// Optional for decoding sessions created before this per-recording choice.
     var transcribe: Bool?
+    var keepVideo: Bool?
 }

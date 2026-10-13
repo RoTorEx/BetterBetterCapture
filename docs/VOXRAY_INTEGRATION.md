@@ -12,12 +12,14 @@ version; failure to discover it does not prevent profile loading or capture.
 No XPC operation can stop capture or delete an original.
 
 The Integrations page inside the menu-bar panel offers a name and a Voxray profile, including an
-unassigned local recording. The profile remains editable during capture in both
-recording modes. Stop freezes its current value before asynchronous shutdown
+unassigned local recording. The name and profile remain editable during capture in both
+recording modes. Stop freezes their current values before asynchronous shutdown
 and finalization; subsequent menu changes apply to later captures. Clearing the
 profile before Stop keeps that capture local, even if a profile is selected
 while it finalizes. Only an explicit later Process action may assign it again.
-The Transcript checkbox is also editable before/during capture and frozen at
+The Keep video checkbox defaults off and is also frozen at Stop. It adds a
+video copy to the Voxray call folder while retaining canonical audio for
+transcription. It never deletes BBC originals. The Transcript checkbox is also editable before/during capture and frozen at
 Stop. It defaults to enabled to preserve existing behavior and is saved with
 the session; later menu changes cannot alter queued work or accepted retries.
 Discovery failure never disables recording. Each
@@ -65,7 +67,9 @@ For an assigned profile, the Transcript checkbox chooses import-only or import
 plus transcription. Import-only completes with the `stored` job stage and a
 "Filed without transcript" history label. It never invokes MacWhisper.
 Screen/video capture keeps the recorder's original video and its finalized copy;
-Voxray extracts audio for its call folder, then transcribes only when requested. The standalone
+Voxray extracts audio for its call folder, optionally keeps video there, then
+transcribes only when requested. Refresh reconciles completed saved jobs with
+Voxray without resubmitting or rerunning them. The standalone
 Voxray CLI can import without transcription; it is a separate workflow.
 
 The XPC adapter bounds short requests at 30 seconds and processing at two hours

@@ -10,7 +10,7 @@ struct CallRecordingsView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 TextField("Call name (optional)", text: $calls.name)
-                    .textFieldStyle(.roundedBorder).disabled(isBusy)
+                    .textFieldStyle(.roundedBorder).disabled(isStopping)
                 Picker("Destination", selection: $calls.profile) {
                     Text("Unassigned — save locally").tag("")
                     ForEach(calls.profiles) { Text($0.id).tag($0.id) }
@@ -18,6 +18,10 @@ struct CallRecordingsView: View {
                 .disabled(isStopping)
                 Toggle("Transcript", isOn: $calls.transcribe)
                     .toggleStyle(.checkbox).disabled(isStopping)
+                Toggle("Keep video", isOn: $calls.keepVideo)
+                    .toggleStyle(.checkbox).disabled(isStopping)
+                Text("Video captures always file audio; enable to also keep video in the call folder.")
+                    .font(.caption).foregroundStyle(.secondary)
                 if calls.integrationError != nil {
                     Text("Voxray unavailable. Recording still works.")
                         .font(.caption).foregroundStyle(.secondary)

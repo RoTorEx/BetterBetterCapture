@@ -3,6 +3,41 @@ import Testing
 @testable import BetterBetterCapture
 
 @MainActor struct CallWorkflowTests {
+    @Test(arguments: ["mov", "m4a"]) func editedNameAndVideoChoiceFreezeAtStop(mediaExtension: String) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CaptureSessionStore(registry: directory.appending(path: "registry"))
+        let client = FailingVoxray()
+        client.fail = false
+        let workflow = CallWorkflow(store: store, client: client)
+        let capture = try store.begin(directory: directory, name: "", profile: "aveni")
+        workflow.name = "Engineering Daily"
+        workflow.profile = "aveni"
+        workflow.keepVideo = true
+        var stopped = workflow.finishCapture(capture)
+        workflow.name = "Next recording"
+        workflow.keepVideo = false
+        stopped.savedFile = stopped.directory.appending(path: "record." + mediaExtension)
+        await workflow.process(stopped, assignCurrentProfile: false)
+        #expect(client.submitted.last?.name == "Engineering Daily")
+        #expect(client.submitted.last?.keepVideo == true)
+    }
+
+    @Test func refreshReconcilesCompletedSavedJobWithoutSubmittingAgain() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CaptureSessionStore(registry: directory.appending(path: "registry"))
+        var session = try store.begin(directory: directory, name: "Daily", profile: "aveni")
+        session.state = "saved"
+        session.savedFile = session.directory.appending(path: "record.mov")
+        try store.save(session)
+        let client = FailingVoxray()
+        client.completed = true
+        await CallWorkflow(store: store, client: client).refresh()
+        #expect(store.sessions.first?.state == "ready")
+        #expect(store.sessions.first?.transcript?.lastPathComponent == "transcript.txt")
+        #expect(client.submitted.isEmpty)
+    }
     @Test(arguments: [false, true]) func versionDiscoveryDoesNotBlockProfiles(unavailable: Bool) async {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -52,6 +87,7 @@ import Testing
         let workflow = CallWorkflow(store: store, client: client)
         for initial in ["", "aveni"] {
             let captured = try store.begin(directory: directory, name: "Daily", profile: initial)
+            workflow.name = "Daily"
             workflow.profile = "thira"
             var stopped = workflow.finishCapture(captured)
             workflow.profile = "aveni" // Another capture starts while this one finalizes.
@@ -151,6 +187,7 @@ import Testing
 @MainActor private final class FailingVoxray: VoxrayServing {
     var fail = true
     var versionUnavailable = false
+    var completed = false
     var submitted: [CaptureSession] = []
 
     func profiles() async throws -> [VoxrayProfile] { [VoxrayProfile(id: "aveni", callsDir: "/tmp/aveni")] }
@@ -165,5 +202,9 @@ import Testing
                          transcript: "transcript.txt", error: nil)
     }
     func run(_ id: UUID) async throws -> VoxrayJob { throw NSError(domain: "unused", code: 1) }
-    func status(_ id: UUID) async throws -> VoxrayJob { throw NSError(domain: "unused", code: 1) }
+    func status(_ id: UUID) async throws -> VoxrayJob {
+        guard completed else { throw NSError(domain: "unused", code: 1) }
+        return VoxrayJob(id: id.uuidString, stage: "ready", recording: "/tmp/record.m4a",
+                         transcript: "/tmp/transcript.txt", error: nil)
+    }
 }

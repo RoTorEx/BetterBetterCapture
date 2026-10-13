@@ -6,6 +6,7 @@ import Observation
     var name = ""
     var profile = ""
     var transcribe = true
+    var keepVideo = false
     private(set) var profiles: [VoxrayProfile] = []
     private(set) var version: String?
     private(set) var integrationError: String?
@@ -24,16 +25,27 @@ import Observation
             integrationError = nil
         } catch { integrationError = error.localizedDescription }
         // A helper or app restart does not lose accepted jobs. The OS lock prevents duplicates.
-        for session in store.sessions where session.state == "transcribing" {
-            await process(session)
+        for var session in store.sessions where session.state == "transcribing" ||
+            (session.state == "saved" && !session.profile.isEmpty) {
+            guard !activeJobs.contains(session.id) else { continue }
+            if session.state == "transcribing" {
+                await process(session)
+            } else if let job = try? await client.status(session.id), ["ready", "stored"].contains(job.stage) {
+                session.state = job.stage == "ready" ? "ready" : "filed"
+                session.error = job.error
+                session.transcript = job.stage == "ready" ? URL(fileURLWithPath: job.transcript) : nil
+                try? store.save(session)
+            }
         }
     }
 
     /// Freeze routing when Stop is accepted, before capture shutdown or queued processing.
     func finishCapture(_ original: CaptureSession) -> CaptureSession {
         var session = original
+        session.name = name
         session.profile = profile
         session.transcribe = transcribe
+        session.keepVideo = keepVideo
         session.state = "processing"
         try? store.save(session)
         return session
@@ -47,6 +59,7 @@ import Observation
             session.profile = profile
             session.name = name
             session.transcribe = transcribe
+            session.keepVideo = keepVideo
         }
         activeJobs.insert(session.id)
         defer { activeJobs.remove(session.id) }

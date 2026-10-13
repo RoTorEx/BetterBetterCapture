@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Allow editing call names during capture and freeze the final name at Stop.
+- Add Keep video to file video alongside audio in Voxray call folders.
+- Reconcile saved history entries with completed Voxray jobs on refresh.
+
 ## [2026.4.2] - 2026-10-12
 
 - Focus the menu-bar panel when opened through Toggle Window so Escape closes
