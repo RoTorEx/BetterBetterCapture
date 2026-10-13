@@ -77,7 +77,7 @@ struct MenuBarView: View {
             }
             .padding(12)
             MenuBarDivider()
-            CallRecordingsView(calls: viewModel.calls, isAudioOnly: viewModel.settings.recordAudioOnly,
+            VoxrayIntegrationView(calls: viewModel.calls, isAudioOnly: viewModel.settings.recordAudioOnly,
                                isStopping: viewModel.isStopping)
         }
         .onAppear { MenuBarWindowController.focus() }

@@ -33,10 +33,10 @@
   output volume supports it, with ordinary filesystem synchronization as the
   fallback for unsupported volumes. Real synchronization I/O errors fail visibly.
 - Recovery files survive cancellation, successful processing and restart until
-  explicit deletion. Session history detects interrupted captures and can open
-  originals or reassemble audio fragments into a new copy without removing them.
-- The Integrations button beside Settings opens call settings and recording
-  history inside the existing menu-bar panel, with the same material and scrolling.
+  explicit deletion. Persistent session metadata detects interrupted captures; originals and recovery
+  fragments remain on disk. Recovery support is retained internally.
+- The Integrations button beside Settings opens only Voxray integration settings
+  inside the existing menu-bar panel, with the same material and scrolling.
   It does not activate a separate application window or change Spaces. Back or
   Escape returns to the main menu; reopening the panel starts at the main menu.
   Integration settings stay available during capture.
@@ -53,8 +53,8 @@
   stack vertically without truncating their labels.
   With no destination selected, the name and processing checkboxes are disabled
   and a local-only explanation is shown. Selecting a profile re-enables them
-  without clearing their values. Destination selection and access to recording
-  history remain available. Unassigned recordings stay in BBC's configured
+  without clearing their values. Destination selection remains available. The Integrations page has no recording
+  history, per-recording action buttons, or recording list. Unassigned recordings stay in BBC's configured
   output folder and never start Voxray processing automatically.
   The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
@@ -63,7 +63,8 @@
   explicitly processed later. Unavailable integration
   allows unassigned recording. Native XPC handoff happens only after the finalized
   file is synchronized; transcription never controls capture or deletes originals.
-  Saved recording and ready transcript are separate visible states, with retry.
+  Saved recording and ready transcript remain separate persisted states, with
+  retry support retained internally.
   A per-recording Transcript checkbox selects whether the assigned recording
   is only filed as audio or also transcribed. It is enabled by default for
   compatibility, editable before/during capture, and frozen alongside the

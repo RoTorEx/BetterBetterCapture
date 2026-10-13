@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Remove recording history and per-recording actions from Integrations, leaving
+  only Voxray settings while preserving recordings and session metadata.
+
 ## [2026.4.3] - 2026-10-13
 
 - Disable call name and processing options for unassigned local recordings,

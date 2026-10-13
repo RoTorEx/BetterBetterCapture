@@ -16,7 +16,7 @@ unassigned local recording. The name and profile remain editable during capture 
 recording modes. Stop freezes their current values before asynchronous shutdown
 and finalization; subsequent menu changes apply to later captures. Clearing the
 profile before Stop keeps that capture local, even if a profile is selected
-while it finalizes. Only an explicit later Process action may assign it again.
+while it finalizes. It can be filed later through the standalone Voxray CLI.
 The Keep video checkbox defaults off and is also frozen at Stop. It adds a
 video copy to the Voxray call folder while retaining canonical audio for
 transcription. It never deletes BBC originals. The Transcript checkbox is also editable before/during capture and frozen at
@@ -48,8 +48,8 @@ would delete the original.
 
 Session records live in Application Support/CaptureSessions, with a second
 `session.json` inside each recording folder. The folder bookmark preserves
-access after relaunch. Restart marks unfinished captures as interrupted. The
-menu can open original material or export a new `Recovered-UUID.m4a` using the
+access after relaunch. Restart marks unfinished captures as interrupted. The Integrations page shows only Voxray settings, with no recording list or
+per-recording actions. Recovery support is retained internally and can export a new `Recovered-UUID.m4a` using the
 separate source fragments and their recorded offsets, preserving originals.
 Malformed registry entries are retained; folder metadata can rediscover missing
 registry entries. Older loose recordings are not migrated automatically.
@@ -57,15 +57,15 @@ registry entries. Older loose recordings are not migrated automatically.
 After a finalized audio/video file is synchronized, a separate task submits its
 UUID, exact path, capture time in Europe/Warsaw, profile and name to Voxray.
 Capture and the serial audio-processing queue do not await transcription.
-History distinguishes original captured, final recording saved and transcript
-ready. Failed jobs remain saved and offer retry. Accepted jobs can retry from
+Persistent session states distinguish original captured, final recording saved and transcript
+ready. Failed jobs remain saved and can be retried with `voxray jobs run`. Accepted jobs can retry from
 Voxray's snapshot even after its current config changes. Unassigned recordings
-can use the current menu name/profile when processing is requested later.
+can be imported later with the standalone Voxray CLI.
 Feedback remains an explicit separate Voxray command.
 
 For an assigned profile, the Transcript checkbox chooses import-only or import
 plus transcription. Import-only completes with the `stored` job stage and a
-"Filed without transcript" history label. It never invokes MacWhisper.
+persisted `filed` state. It never invokes MacWhisper.
 Screen/video capture keeps the recorder's original video and its finalized copy;
 Voxray extracts audio for its call folder, optionally keeps video there, then
 transcribes only when requested. Refresh reconciles completed saved jobs with
