@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.4.4] - 2026-10-13
+
 - Keep Voxray profiles in configuration order, with Unassigned first.
 
 - Remove recording history and per-recording actions from Integrations, leaving
