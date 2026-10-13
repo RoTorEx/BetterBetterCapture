@@ -51,6 +51,11 @@
   updates menu layout without animating the entire panel or sliding its blocks.
   Transcript and Keep video share one row when both labels fit; otherwise they
   stack vertically without truncating their labels.
+  With no destination selected, the name and processing checkboxes are disabled
+  and a local-only explanation is shown. Selecting a profile re-enables them
+  without clearing their values. Destination selection and access to recording
+  history remain available. Unassigned recordings stay in BBC's configured
+  output folder and never start Voxray processing automatically.
   The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
   Stop freezes the selected profile before shutdown; changes for a later capture

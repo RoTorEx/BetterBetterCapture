@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Disable call name and processing options for unassigned local recordings,
+  keeping destination selection and recording history available.
+
 - Place Transcript and Keep video on one row when they fit, with a vertical
   fallback for narrower layouts.
 
