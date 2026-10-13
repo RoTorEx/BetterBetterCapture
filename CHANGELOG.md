@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.4.3] - 2026-10-13
+
 - Disable call name and processing options for unassigned local recordings,
   keeping destination selection and recording history available.
 
