@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Place Transcript and Keep video on one row when they fit, with a vertical
+  fallback for narrower layouts.
+
 - Show Keep video only for video capture and remove panel-wide mode-switch
   animation so mode changes do not slide menu sections through resizing.
 

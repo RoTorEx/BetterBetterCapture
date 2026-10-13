@@ -49,6 +49,8 @@
   Keep video and its explanation appear only in Screen + Audio mode, including
   during capture. Audio mode has no video retention control. Switching modes
   updates menu layout without animating the entire panel or sliding its blocks.
+  Transcript and Keep video share one row when both labels fit; otherwise they
+  stack vertically without truncating their labels.
   The profile can be selected,
   changed or cleared before and during either audio-only or screen/video capture.
   Stop freezes the selected profile before shutdown; changes for a later capture

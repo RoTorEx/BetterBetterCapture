@@ -16,11 +16,11 @@ struct CallRecordingsView: View {
                     ForEach(calls.profiles) { Text($0.id).tag($0.id) }
                 }
                 .disabled(isStopping)
-                Toggle("Transcript", isOn: $calls.transcribe)
-                    .toggleStyle(.checkbox).disabled(isStopping)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 16) { processingOptions }
+                    VStack(alignment: .leading, spacing: 8) { processingOptions }
+                }
                 if !isAudioOnly {
-                    Toggle("Keep video", isOn: $calls.keepVideo)
-                        .toggleStyle(.checkbox).disabled(isStopping)
                     Text("Video captures always file audio; enable to also keep video in the call folder.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -67,6 +67,17 @@ struct CallRecordingsView: View {
         }
         .padding(16)
         .task { await calls.refresh() }
+    }
+
+    @ViewBuilder private var processingOptions: some View {
+        Toggle("Transcript", isOn: $calls.transcribe)
+            .toggleStyle(.checkbox).disabled(isStopping)
+            .fixedSize(horizontal: true, vertical: false)
+        if !isAudioOnly {
+            Toggle("Keep video", isOn: $calls.keepVideo)
+                .toggleStyle(.checkbox).disabled(isStopping)
+                .fixedSize(horizontal: true, vertical: false)
+        }
     }
 
     private func label(_ session: CaptureSession) -> String {
