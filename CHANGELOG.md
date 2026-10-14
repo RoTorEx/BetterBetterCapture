@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.4.5] - 2026-10-14
+
 - Put Destination before Call name and clearly explain why the dimmed name
   field is unavailable, while preserving editing during assigned recordings.
 
