@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Put Destination before Call name and clearly explain why the dimmed name
+  field is unavailable, while preserving editing during assigned recordings.
+
 ## [2026.4.4] - 2026-10-13
 
 - Keep Voxray profiles in configuration order, with Unassigned first.

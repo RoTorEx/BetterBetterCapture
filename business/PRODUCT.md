@@ -54,7 +54,10 @@
   Transcript and Keep video share one row when both labels fit; otherwise they
   stack vertically without truncating their labels.
   With no destination selected, the name and processing checkboxes are disabled
-  and a local-only explanation is shown. Selecting a profile re-enables them
+  and a local-only explanation is shown. Destination appears before the call
+  name. The call name has a persistent label, a visibly dimmed disabled field,
+  and an explicit explanation when unavailable: select a destination, or wait
+  for recording shutdown to finish. Selecting a profile re-enables them
   without clearing their values. Destination selection remains available. The Integrations page has no recording
   history, per-recording action buttons, or recording list. Unassigned recordings stay in BBC's configured
   output folder and never start Voxray processing automatically.
