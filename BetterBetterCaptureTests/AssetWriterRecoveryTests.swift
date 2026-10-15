@@ -135,6 +135,31 @@ extension AssetWriterTests {
         ]))
     }
 
+    @Test func finishedRecordingIsVisibleBesideTechnicalCaptureData() async throws {
+        let inbox = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: inbox) }
+        let store = CaptureSessionStore(registry: inbox.appending(path: "registry"))
+        let session = try store.begin(directory: inbox, name: "Daily", profile: "")
+        let settings = makeStore()
+        settings.recordAudioOnly = true
+        settings.captureSystemAudio = true
+        let finished = inbox.appending(path: "call.m4a")
+        let writer = AssetWriter()
+        try writer.setup(url: finished, captureDirectory: session.directory,
+                         settings: settings, videoSize: videoSize)
+        try writer.startWriting()
+        writer.appendAudioSample(try makeSilentAudioSampleBuffer(at: .zero))
+
+        let result = try await writer.finishWriting()
+        #expect(result.url == finished)
+        #expect(try await AVURLAsset(url: finished).loadTracks(withMediaType: .audio).count == 1)
+        #expect(session.directory.deletingLastPathComponent().lastPathComponent == "_CaptureData")
+        #expect(FileManager.default.fileExists(atPath: session.directory.appending(path: "session.json").path))
+        #expect(FileManager.default.fileExists(atPath: session.directory.appending(path: "call-unprocessed.mov").path))
+        #expect(FileManager.default.fileExists(atPath: session.directory.appending(path: "call-recovery").path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.path).contains("call.m4a"))
+    }
+
     @Test func syncFailureLeavesPlayableUncommittedFragment() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -166,6 +191,8 @@ extension AssetWriterTests {
         let files = try FileManager.default.contentsOfDirectory(at: journal.directory, includingPropertiesForKeys: nil)
         let before = try files.map { try Data(contentsOf: $0) }
         let recovered = try await store.recover(session)
+        #expect(recovered.deletingLastPathComponent().resolvingSymlinksInPath()
+                == directory.resolvingSymlinksInPath())
         #expect(try await AVURLAsset(url: recovered).loadTracks(withMediaType: .audio).count == 1)
         #expect(try await AVURLAsset(url: recovered).load(.duration).seconds > 0)
         #expect(try files.map { try Data(contentsOf: $0) } == before)

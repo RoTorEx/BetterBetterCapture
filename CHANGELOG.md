@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Show finished recordings directly in the output folder and keep capture
+  originals, recovery audio, and metadata under `_CaptureData/<UUID>`.
+
 - Reset Voxray name, destination, Transcript and Keep video after Stop freezes
   the completed recording's choices, so the next recording starts unassigned.
 

@@ -17,9 +17,12 @@
   explicitly deleted, including after a processed copy is synchronized. Failures
   never overwrite an existing
   destination or intentionally delete captured samples. Output names remain
-  unique when recordings start within the same second.
+  unique when recordings start within the same second. Finished audio and video
+  files appear directly in the selected output folder. Each capture's source
+  container, recovery fragments, and session metadata remain under
+  `_CaptureData/<UUID>` in that folder; successful processing does not delete them.
 - During capture, separate system/microphone lossless CAF fragments are written
-  into a visible `-recovery` folder next to the output. Their filenames contain
+  into a visible `-recovery` folder next to the source container. Their filenames contain
   the source and starting offset in seconds. Open `.partial.caf` fragments use
   an unknown-length CAF data chunk and require no final header rewrite to read.
   Fragments close and synchronize after about 2 seconds of source audio, and all

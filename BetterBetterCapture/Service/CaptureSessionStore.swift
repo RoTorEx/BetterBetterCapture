@@ -31,8 +31,9 @@ import Observation
 
     func begin(directory: URL, name: String, profile: String) throws -> CaptureSession {
         let id = UUID()
-        let folder = directory.appending(path: id.uuidString)
+        let folder = directory.appending(path: "_CaptureData").appending(path: id.uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try RecordingFileSync.synchronizeDirectory(folder.deletingLastPathComponent())
         try RecordingFileSync.synchronizeDirectory(directory)
         var session = CaptureSession(
             id: id, startedAt: Date(), directory: folder, name: name,
@@ -62,16 +63,19 @@ import Observation
     func discover(in directory: URL) {
         let scoped = directory.startAccessingSecurityScopedResource()
         defer { if scoped { directory.stopAccessingSecurityScopedResource() } }
-        guard let folders = try? FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil) else { return }
-        for folder in folders where UUID(uuidString: folder.lastPathComponent) != nil {
-            guard var session = try? JSONDecoder().decode(
-                CaptureSession.self, from: Data(contentsOf: folder.appending(path: "session.json"))),
-                  !sessions.contains(where: { $0.id == session.id }) else { continue }
-            if ["starting", "recording", "processing"].contains(session.state) {
-                session.state = "interrupted"
+        let locations = [directory, directory.appending(path: "_CaptureData")]
+        for location in locations {
+            guard let folders = try? FileManager.default.contentsOfDirectory(
+                at: location, includingPropertiesForKeys: nil) else { continue }
+            for folder in folders where UUID(uuidString: folder.lastPathComponent) != nil {
+                guard var session = try? JSONDecoder().decode(
+                    CaptureSession.self, from: Data(contentsOf: folder.appending(path: "session.json"))),
+                      !sessions.contains(where: { $0.id == session.id }) else { continue }
+                if ["starting", "recording", "processing"].contains(session.state) {
+                    session.state = "interrupted"
+                }
+                try? save(session)
             }
-            try? save(session)
         }
     }
 
@@ -113,12 +117,15 @@ import Observation
             asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
             throw AssetWriterError.noOutputURL
         }
-        let recovered = directory.appending(path: "Recovered-" + UUID().uuidString + ".m4a")
+        let parent = directory.deletingLastPathComponent()
+        let outputDirectory = parent.lastPathComponent == "_CaptureData"
+            ? parent.deletingLastPathComponent() : directory
+        let recovered = outputDirectory.appending(path: "Recovered-" + UUID().uuidString + ".m4a")
         try await exporter.export(to: recovered, as: .m4a)
         let file = try FileHandle(forWritingTo: recovered)
         defer { try? file.close() }
         try RecordingFileSync.synchronize(file)
-        try RecordingFileSync.synchronizeDirectory(directory)
+        try RecordingFileSync.synchronizeDirectory(outputDirectory)
         return recovered
     }
 

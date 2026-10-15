@@ -29,8 +29,11 @@ Stop. It defaults to enabled to preserve existing behavior and is saved with
 the session; later menu changes cannot alter queued work or accepted retries.
 Profile discovery follows TOML declaration order, with default first; the UI
 keeps that sequence and places Unassigned before it. Discovery failure never disables recording. Each
-capture gets its own UUID folder under the selected output directory, separate
-from the eventual call name. If that output folder cannot be created, capture
+capture keeps its technical files in `_CaptureData/<UUID>` under the selected
+output directory, separate from the eventual call name. Finished audio or video
+appears directly in the output directory with a unique timestamp and capture ID.
+Recovery exports also appear there. Existing UUID folders directly under the
+output directory remain readable. If that output folder cannot be created, capture
 falls back to the app's Application Support/Recordings and shows that path.
 If neither destination works, Start fails visibly. Metadata failures do not
 prevent media capture in an otherwise writable folder.

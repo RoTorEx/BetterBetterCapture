@@ -97,9 +97,9 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
     ///   - url: The output file URL
     ///   - settings: The settings store containing encoding configuration
     ///   - videoSize: The dimensions of the video
-    @MainActor func setup(url: URL, settings: SettingsStore, videoSize: CGSize) throws {
-        // Ensure output directory exists
-        let directory = url.deletingLastPathComponent()
+    @MainActor func setup(url: URL, captureDirectory: URL? = nil, settings: SettingsStore, videoSize: CGSize) throws {
+        // Keep source media and recovery fragments separate from the finished recording.
+        let directory = captureDirectory ?? url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         // Create asset writer. Audio-only recordings use audio-focused file types.
@@ -114,55 +114,8 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
         let captureURL = try prepareCapture(url: url, directory: directory, fileType: fileType, settings: settings)
         guard let assetWriter else { throw AssetWriterError.failedToCreateWriter }
 
-        // Configure video input unless audio-only recording is active
-        if !settings.recordAudioOnly {
-            let videoSettings = createVideoSettings(from: settings, size: videoSize)
-            videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-            videoInput?.expectsMediaDataInRealTime = true
-
-            if let videoInput, assetWriter.canAdd(videoInput) {
-                assetWriter.add(videoInput)
-
-                // Create pixel buffer adaptor for appending raw pixel buffers from ScreenCaptureKit.
-                // Must match the pixel format configured on SCStreamConfiguration in CaptureEngine.
-                let pixelFormat: OSType =
-                    (settings.captureHDR && settings.videoCodec.supportsHDR)
-                    ? settings.videoCodec.hdrPixelFormat
-                    : kCVPixelFormatType_32BGRA
-
-                let sourcePixelBufferAttributes: [String: Any] = [
-                    kCVPixelBufferPixelFormatTypeKey as String: pixelFormat,
-                    kCVPixelBufferWidthKey as String: Int(videoSize.width),
-                    kCVPixelBufferHeightKey as String: Int(videoSize.height)
-                ]
-                pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
-                    assetWriterInput: videoInput,
-                    sourcePixelBufferAttributes: sourcePixelBufferAttributes
-                )
-            }
-        }
-
-        // Configure audio input for system audio
-        if settings.captureSystemAudio {
-            let audioSettings = createAudioSettings(from: settings)
-            audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
-            audioInput?.expectsMediaDataInRealTime = true
-
-            if let audioInput, assetWriter.canAdd(audioInput) {
-                assetWriter.add(audioInput)
-            }
-        }
-
-        // Configure microphone input as separate track
-        if settings.captureMicrophone {
-            let micSettings = createAudioSettings(from: settings)
-            microphoneInput = AVAssetWriterInput(mediaType: .audio, outputSettings: micSettings)
-            microphoneInput?.expectsMediaDataInRealTime = true
-
-            if let microphoneInput, assetWriter.canAdd(microphoneInput) {
-                assetWriter.add(microphoneInput)
-            }
-        }
+        configureVideoInput(settings: settings, size: videoSize, writer: assetWriter)
+        configureAudioInputs(settings: settings, writer: assetWriter)
 
         activeHDRPreset = settings.hdrPreset
         let isProResHDR = activeHDRPreset != .sdr
@@ -196,6 +149,58 @@ nonisolated final class AssetWriter: CaptureEngineSampleBufferDelegate, @uncheck
             mic gain: \(settings.microphoneGain.displayName)
             """
         )
+    }
+
+    @MainActor private func configureVideoInput(settings: SettingsStore, size: CGSize, writer: AVAssetWriter) {
+        if !settings.recordAudioOnly {
+            let videoSettings = createVideoSettings(from: settings, size: size)
+            videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+            videoInput?.expectsMediaDataInRealTime = true
+
+            if let videoInput, writer.canAdd(videoInput) {
+                writer.add(videoInput)
+
+                // Create pixel buffer adaptor for appending raw pixel buffers from ScreenCaptureKit.
+                // Must match the pixel format configured on SCStreamConfiguration in CaptureEngine.
+                let pixelFormat: OSType =
+                    (settings.captureHDR && settings.videoCodec.supportsHDR)
+                    ? settings.videoCodec.hdrPixelFormat
+                    : kCVPixelFormatType_32BGRA
+
+                let sourcePixelBufferAttributes: [String: Any] = [
+                    kCVPixelBufferPixelFormatTypeKey as String: pixelFormat,
+                    kCVPixelBufferWidthKey as String: Int(size.width),
+                    kCVPixelBufferHeightKey as String: Int(size.height)
+                ]
+                pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
+                    assetWriterInput: videoInput,
+                    sourcePixelBufferAttributes: sourcePixelBufferAttributes
+                )
+            }
+        }
+    }
+
+    @MainActor private func configureAudioInputs(settings: SettingsStore, writer: AVAssetWriter) {
+        if settings.captureSystemAudio {
+            let audioSettings = createAudioSettings(from: settings)
+            audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            audioInput?.expectsMediaDataInRealTime = true
+
+            if let audioInput, writer.canAdd(audioInput) {
+                writer.add(audioInput)
+            }
+        }
+
+        // Configure microphone input as separate track
+        if settings.captureMicrophone {
+            let micSettings = createAudioSettings(from: settings)
+            microphoneInput = AVAssetWriterInput(mediaType: .audio, outputSettings: micSettings)
+            microphoneInput?.expectsMediaDataInRealTime = true
+
+            if let microphoneInput, writer.canAdd(microphoneInput) {
+                writer.add(microphoneInput)
+            }
+        }
     }
 
     /// Starts the writing session

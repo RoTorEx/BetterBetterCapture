@@ -128,7 +128,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Choose a call name and destination in the menu before recording, or keep it
 unassigned. Recording works when Voxray is unavailable. Final audio processing
 runs before the native handoff; transcript failure keeps the saved recording and
-offers retry. Originals and PCM fragments remain until explicit deletion.
-After interruption, use **Open original** or **Recover audio** in session history.
+offers retry. Finished audio and video files appear in the selected output folder.
+Originals, PCM fragments and session metadata remain in its `_CaptureData` folder
+until explicit deletion.
+Interrupted captures retain their originals and recovery fragments for manual recovery.
 See [integration and recovery](docs/VOXRAY_INTEGRATION.md) for ownership,
 contracts, required Voxray capabilities and verification limits.

@@ -175,6 +175,23 @@ import Testing
         #expect(FileManager.default.fileExists(atPath: session.directory.path))
     }
 
+    @Test func folderDiscoveryReadsCurrentAndLegacyCaptureFolders() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = CaptureSessionStore(registry: directory.appending(path: "source-registry"))
+        let current = try source.begin(directory: directory, name: "Current", profile: "")
+        let legacyID = UUID()
+        let legacy = CaptureSession(id: legacyID, startedAt: Date(),
+                                    directory: directory.appending(path: legacyID.uuidString),
+                                    name: "Legacy", profile: "", state: "saved")
+        try FileManager.default.createDirectory(at: legacy.directory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(legacy).write(to: legacy.directory.appending(path: "session.json"))
+
+        let discovered = CaptureSessionStore(registry: directory.appending(path: "empty-registry"))
+        discovered.discover(in: directory)
+        #expect(Set(discovered.sessions.map(\.id)) == Set([current.id, legacy.id]))
+    }
+
     @Test func metadataFailureDoesNotPreventCreatingCaptureFolder() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

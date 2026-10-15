@@ -48,7 +48,9 @@ extension RecorderViewModel {
 
             // Setup asset writer
             let outputURL = try prepareCaptureSession()
-            try assetWriter.setup(url: outputURL, settings: settings, videoSize: videoSize)
+            guard let captureDirectory = captureSession?.directory else { throw AssetWriterError.noOutputURL }
+            try assetWriter.setup(url: outputURL, captureDirectory: captureDirectory,
+                                  settings: settings, videoSize: videoSize)
             try assetWriter.startWriting()
             logger.info("AssetWriter ready")
 
@@ -188,19 +190,22 @@ extension RecorderViewModel {
 
     private func prepareCaptureSession() throws -> URL {
         let session: CaptureSession
+        var outputDirectory: URL
         do {
-            session = try calls.store.begin(directory: settings.captureOutputDirectory(), name: calls.name, profile: calls.profile)
+            outputDirectory = try settings.captureOutputDirectory()
+            session = try calls.store.begin(directory: outputDirectory, name: calls.name, profile: calls.profile)
             storageNotice = nil
         } catch {
             releaseOutputAccess()
-            let fallback = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            outputDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appending(path: "Recordings")
-            session = try calls.store.begin(directory: fallback, name: calls.name, profile: calls.profile)
-            storageNotice = "Output folder unavailable. Recording is saved in " + fallback.path
+            session = try calls.store.begin(directory: outputDirectory, name: calls.name, profile: calls.profile)
+            storageNotice = "Output folder unavailable. Recording is saved in " + outputDirectory.path
         }
         captureSession = session
-        let filename = settings.generateOutputURL().lastPathComponent
-        return session.directory.appending(path: filename)
+        let generated = URL(filePath: settings.generateFilename())
+        let filename = generated.deletingPathExtension().lastPathComponent + "-" + session.id.uuidString
+        return outputDirectory.appending(path: filename).appendingPathExtension(generated.pathExtension)
     }
 
     private func confirmCaptureStarted() async throws {
