@@ -48,6 +48,10 @@ import Observation
         session.keepVideo = keepVideo
         session.state = "processing"
         try? store.save(session)
+        name = ""
+        profile = ""
+        transcribe = true
+        keepVideo = false
         return session
     }
 

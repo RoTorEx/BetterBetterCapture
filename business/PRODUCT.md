@@ -68,6 +68,9 @@
   explicitly processed later. Unavailable integration
   allows unassigned recording. Native XPC handoff happens only after the finalized
   file is synchronized; transcription never controls capture or deletes originals.
+  Once Stop accepts the capture, the editable Voxray name, destination, Transcript,
+  and Keep video choices reset to their defaults for the next recording. The
+  stopped capture keeps its frozen choices even while finalization continues.
   Saved recording and ready transcript remain separate persisted states, with
   retry support retained internally.
   A per-recording Transcript checkbox selects whether the assigned recording

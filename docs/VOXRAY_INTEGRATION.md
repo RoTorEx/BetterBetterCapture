@@ -17,6 +17,11 @@ recording modes. Stop freezes their current values before asynchronous shutdown
 and finalization; subsequent menu changes apply to later captures. Clearing the
 profile before Stop keeps that capture local, even if a profile is selected
 while it finalizes. It can be filed later through the standalone Voxray CLI.
+After Stop accepts a capture, the Integrations controls reset to an empty name,
+Unassigned destination, Transcript on and Keep video off for the next recording.
+Unassigned saves to BetterBetterCapture's configured output folder without
+submitting anything to Voxray; selecting a profile with Transcript off still
+imports audio into that profile.
 The Keep video checkbox defaults off and is also frozen at Stop. It adds a
 video copy to the Voxray call folder while retaining canonical audio for
 transcription. It never deletes BBC originals. The Transcript checkbox is also editable before/during capture and frozen at

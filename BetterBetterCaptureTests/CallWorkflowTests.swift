@@ -23,6 +23,30 @@ import Testing
         #expect(client.submitted.last?.keepVideo == true)
     }
 
+    @Test func stopResetsIntegrationChoicesForNextRecording() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CaptureSessionStore(registry: directory.appending(path: "registry"))
+        let workflow = CallWorkflow(store: store, client: FailingVoxray())
+        let capture = try store.begin(directory: directory, name: "", profile: "")
+        workflow.name = "Engineering Daily"
+        workflow.profile = "aveni"
+        workflow.transcribe = false
+        workflow.keepVideo = true
+
+        let stopped = workflow.finishCapture(capture)
+
+        #expect(stopped.name == "Engineering Daily")
+        #expect(stopped.profile == "aveni")
+        #expect(stopped.transcribe == false)
+        #expect(stopped.keepVideo == true)
+        #expect(workflow.name.isEmpty)
+        #expect(workflow.profile.isEmpty)
+        #expect(workflow.transcribe)
+        #expect(!workflow.keepVideo)
+        #expect(store.sessions.first?.profile == "aveni")
+    }
+
     @Test func refreshReconcilesCompletedSavedJobWithoutSubmittingAgain() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

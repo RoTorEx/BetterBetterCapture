@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Reset Voxray name, destination, Transcript and Keep video after Stop freezes
+  the completed recording's choices, so the next recording starts unassigned.
+
 ## [2026.4.5] - 2026-10-14
 
 - Put Destination before Call name and clearly explain why the dimmed name
