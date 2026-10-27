@@ -123,3 +123,19 @@ The tests used synthetic spoken audio, not a remote meeting; they do not certify
 every device, screen/video mode, filesystem or power-loss condition. Self-review
 checked capture ownership, atomic publication, source retention and retry.
 No release or normal local installation was performed in this stage.
+
+## Google Drive and transcript-only (Voxray 0.6+)
+
+Discovery advertises drive_supported, google_drive and drive_folder. The selected
+profile supplies Drive defaults. The per-call Google Drive checkbox and folder
+ID override are frozen at Stop, persisted in the capture session and passed as
+google_drive/drive_folder. Transcript only maps to transcript_only; it is never a
+persistent default. Unsupported CLI versions receive no extension fields.
+
+Voxray uploads the completed call and verifies its files. Only after ready with
+media_removed=true does the recorder clean up its own opted-in finalized media,
+original container and recovery audio, leaving session metadata and other calls.
+A failed upload preserves media and remains retryable through Retry Voxray or
+reopening Integrations. An empty transcript or unsafe ownership path prevents
+cleanup. Authentication belongs to Voxray; this app adds no Google credentials.
+See Voxray's docs/features/google-drive.md for personal OAuth setup and limits.

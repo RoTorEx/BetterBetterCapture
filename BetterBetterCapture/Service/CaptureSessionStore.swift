@@ -40,6 +40,8 @@ import Observation
             profile: profile, state: "starting")
         session.bookmark = try? folder.bookmarkData(
             options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        session.outputBookmark = try? directory.bookmarkData(
+            options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
         do { try save(session) } catch {
             session.error = "Recording metadata could not be saved: " + error.localizedDescription
             if let index = sessions.firstIndex(where: { $0.id == session.id }) {
@@ -127,6 +129,66 @@ import Observation
         try RecordingFileSync.synchronize(file)
         try RecordingFileSync.synchronizeDirectory(outputDirectory)
         return recovered
+    }
+
+    /// The per-capture opt-in is honored only after Voxray verifies its transcript and upload.
+    func removeMediaAfterTranscript(_ session: CaptureSession, job: VoxrayJob) throws {
+        guard session.transcriptOnly == true, job.stage == "ready", job.mediaRemoved == true,
+              UUID(uuidString: job.id) == session.id else { throw CocoaError(.fileWriteNoPermission) }
+        // Voxray revalidates its saved transcript proof before every bridge response.
+        // The sandboxed recorder must not read arbitrary Voxray library paths.
+        let directory = access(session)
+        let scoped = directory.startAccessingSecurityScopedResource()
+        defer { if scoped { directory.stopAccessingSecurityScopedResource() } }
+        guard directory.lastPathComponent == session.id.uuidString,
+              directory.deletingLastPathComponent().lastPathComponent == "_CaptureData",
+              directory.standardizedFileURL == directory.resolvingSymlinksInPath().standardizedFileURL else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        let output = directory.deletingLastPathComponent().deletingLastPathComponent()
+        let access = try outputAccess(session, expected: output)
+        let outputScoped = access.startAccessingSecurityScopedResource()
+        defer { if outputScoped { access.stopAccessingSecurityScopedResource() } }
+        try validateSavedMedia(session.savedFile, output: output, directory: directory)
+        let extensions: Set<String> = ["mov", "mp4", "m4a", "wav", "caf", "aiff", "flac"]
+        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]) else {
+            throw CocoaError(.fileReadUnknown)
+        }
+        var files: [URL] = []
+        for case let file as URL in enumerator where extensions.contains(file.pathExtension.lowercased()) {
+            let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true,
+                  file.standardizedFileURL == file.resolvingSymlinksInPath().standardizedFileURL else {
+                throw CocoaError(.fileWriteNoPermission)
+            }
+            files.append(file)
+        }
+        if let saved = session.savedFile, !files.contains(saved), FileManager.default.fileExists(atPath: saved.path) {
+            files.append(saved)
+        }
+        for file in files { try FileManager.default.removeItem(at: file) }
+        try RecordingFileSync.synchronizeDirectory(directory)
+        try RecordingFileSync.synchronizeDirectory(output)
+    }
+
+    private func outputAccess(_ session: CaptureSession, expected: URL) throws -> URL {
+        guard let bookmark = session.outputBookmark else { return expected }
+        var stale = false
+        let directory = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope,
+                                relativeTo: nil, bookmarkDataIsStale: &stale)
+        guard directory.standardizedFileURL == expected.standardizedFileURL else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        return directory
+    }
+
+    private func validateSavedMedia(_ saved: URL?, output: URL, directory: URL) throws {
+        guard let saved, FileManager.default.fileExists(atPath: saved.path) else { return }
+        let parent = saved.deletingLastPathComponent().standardizedFileURL
+        guard parent == output.standardizedFileURL || parent == directory.standardizedFileURL,
+              saved.standardizedFileURL == saved.resolvingSymlinksInPath().standardizedFileURL else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
     }
 
     private static func offset(_ url: URL) -> Double {

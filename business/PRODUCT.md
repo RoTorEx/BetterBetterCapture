@@ -13,8 +13,8 @@
   background queue after stop. Final output contains one mixed audio track;
   video is remuxed without a second encode. Each capture has an independent
   writer, settings snapshot and output-directory access for its whole lifetime.
-- A visible `-unprocessed.mov` original remains until it is
-  explicitly deleted, including after a processed copy is synchronized. Failures
+- A visible `-unprocessed.mov` original remains until explicit deletion,
+  including the per-recording Transcript only choice after verified processing. Failures
   never overwrite an existing
   destination or intentionally delete captured samples. Output names remain
   unique when recordings start within the same second. Finished audio and video
@@ -36,7 +36,7 @@
   output volume supports it, with ordinary filesystem synchronization as the
   fallback for unsupported volumes. Real synchronization I/O errors fail visibly.
 - Recovery files survive cancellation, successful processing and restart until
-  explicit deletion. Persistent session metadata detects interrupted captures; originals and recovery
+  explicit deletion, including verified per-call Transcript only cleanup. Persistent session metadata detects interrupted captures; originals and recovery
   fragments remain on disk. Recovery support is retained internally.
 - The Integrations button beside Settings opens only Voxray integration settings
   inside the existing menu-bar panel, with the same material and scrolling.
@@ -50,7 +50,7 @@
 - Voxray call name, profile, Transcript and Keep video remain editable during
   capture and freeze together when Stop is accepted. Keep video defaults off:
   video captures file canonical audio, with an additional video copy in the call
-  folder only when checked. Recorder originals are always retained.
+  folder only when checked. Recorder originals are retained unless Transcript only explicitly requests cleanup.
   Keep video and its explanation appear only in Screen + Audio mode, including
   during capture. Audio mode has no video retention control. Switching modes
   updates menu layout without animating the entire panel or sliding its blocks.
@@ -83,7 +83,7 @@
   See [capture integration](../docs/VOXRAY_INTEGRATION.md).
 - Real-time audio writer backpressure uses a bounded FIFO. Overflow or a flush
   timeout fails explicitly instead of silently producing a recording with gaps.
-- Explicit content exclusion and local-only recording storage.
+- Explicit content exclusion and local recording storage with optional personal Drive archiving.
 - No tracking or analytics.
 
 ## Automation
@@ -136,3 +136,30 @@
 - Recording-state artwork uses transparent 18×18 and 36×36 template renditions,
   matching the idle menu-bar asset sizes so state changes cannot resize the
   macOS status item or introduce an artwork background.
+
+## Optional personal Google Drive archive
+
+Integrations keeps Google Drive and Transcript only on a compact checkbox row,
+with a vertical fallback. A Drive folder ID field appears only while upload is
+selected. Selecting a Voxray destination loads its configured Drive default and
+folder; a per-call folder override can route the call elsewhere without changing
+the local destination. These settings remain editable during capture, freeze at
+Stop, and reset for the next call. Switching to another destination loads that
+profile's defaults. Manual changes survive reopening Integrations.
+
+Upload is owned by Voxray and requires its 0.6 capability announcement. Older
+CLIs keep local handoff working; unsupported options are disabled and omitted
+from requests. No Google credential or network account is used by the recorder.
+Personal Drive needs user OAuth, not a standalone service account. Credentials
+can be configured later in Voxray; unavailable credentials preserve all media.
+Sharing is configured in Google Drive on the selected folder, never by the app.
+
+Transcript only is always off initially and cannot be enabled by configuration.
+Selecting it enables Transcript and disables Keep video; disabling Transcript or
+enabling Keep video clears Transcript only. A nonempty saved transcript and
+Voxray's ready/media_removed confirmation are required before recorder-owned
+finalized media, original containers and recovery audio are deleted. No unrelated
+recording or session metadata is deleted. Integrity checks cannot establish
+speech-recognition accuracy; the UI states that limitation. Default runs retain
+media. Failed processing/uploads preserve media and show an error with Retry
+Voxray; reopening Integrations resumes unfinished assigned jobs.

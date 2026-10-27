@@ -37,7 +37,7 @@ menu-bar experience.
 
 ## Invariants
 
-- Recordings remain local; the app has no tracking or analytics.
+- Recordings remain local by default; only an explicit Google Drive choice may archive a call. The app has no tracking or analytics.
 - External URL actions expose only documented capture/folder operations.
 - Capture, permission, and encoding failures must not silently claim success.
 - New third-party frameworks require explicit user approval.
@@ -62,6 +62,6 @@ menu-bar experience.
 
 ## Non-goals
 
-- Hosted recording, analytics, tracking, or cloud ownership of recordings.
+- Hosted recording services, analytics, tracking, or mandatory cloud storage.
 - Speculative frameworks, abstractions, or compatibility work not required by a
   current feature.

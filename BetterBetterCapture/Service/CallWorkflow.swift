@@ -4,9 +4,33 @@ import Observation
 @Observable @MainActor final class CallWorkflow {
     let store: CaptureSessionStore
     var name = ""
-    var profile = ""
-    var transcribe = true
-    var keepVideo = false
+    var profile = "" {
+        didSet {
+            guard oldValue != profile else { return }
+            applyDriveDefaults()
+        }
+    }
+    var transcribe = true {
+        didSet { if !transcribe { transcriptOnly = false } }
+    }
+    var keepVideo = false {
+        didSet { if keepVideo { transcriptOnly = false } }
+    }
+    var googleDrive = false
+    var driveFolder = ""
+    var transcriptOnly = false {
+        didSet {
+            if transcriptOnly { transcribe = true; keepVideo = false }
+        }
+    }
+    var driveSupported: Bool { profiles.first { $0.id == profile }?.driveSupported == true }
+
+    private func applyDriveDefaults() {
+        let selected = profiles.first { $0.id == profile }
+        googleDrive = selected?.googleDrive ?? false
+        driveFolder = selected?.driveFolder ?? ""
+    }
+
     private(set) var profiles: [VoxrayProfile] = []
     private(set) var version: String?
     private(set) var integrationError: String?
@@ -21,21 +45,16 @@ import Observation
     func refresh() async {
         version = try? await client.version()
         do {
+            let firstDiscovery = profiles.isEmpty
             profiles = try await client.profiles()
+            if firstDiscovery { applyDriveDefaults() }
             integrationError = nil
         } catch { integrationError = error.localizedDescription }
         // A helper or app restart does not lose accepted jobs. The OS lock prevents duplicates.
-        for var session in store.sessions where session.state == "transcribing" ||
+        for session in store.sessions where session.state == "transcribing" ||
             (session.state == "saved" && !session.profile.isEmpty) {
             guard !activeJobs.contains(session.id) else { continue }
-            if session.state == "transcribing" {
-                await process(session)
-            } else if let job = try? await client.status(session.id), ["ready", "stored"].contains(job.stage) {
-                session.state = job.stage == "ready" ? "ready" : "filed"
-                session.error = job.error
-                session.transcript = job.stage == "ready" ? URL(fileURLWithPath: job.transcript) : nil
-                try? store.save(session)
-            }
+            await process(session)
         }
     }
 
@@ -46,12 +65,18 @@ import Observation
         session.profile = profile
         session.transcribe = transcribe
         session.keepVideo = keepVideo
+        session.googleDrive = driveSupported ? googleDrive : nil
+        session.driveFolder = driveSupported && !driveFolder.isEmpty ? driveFolder : nil
+        session.transcriptOnly = driveSupported ? transcriptOnly : nil
         session.state = "processing"
         try? store.save(session)
         name = ""
         profile = ""
         transcribe = true
         keepVideo = false
+        transcriptOnly = false
+        googleDrive = false
+        driveFolder = ""
         return session
     }
 
@@ -64,6 +89,9 @@ import Observation
             session.name = name
             session.transcribe = transcribe
             session.keepVideo = keepVideo
+            session.googleDrive = driveSupported ? googleDrive : nil
+            session.driveFolder = driveSupported && !driveFolder.isEmpty ? driveFolder : nil
+            session.transcriptOnly = driveSupported ? transcriptOnly : nil
         }
         activeJobs.insert(session.id)
         defer { activeJobs.remove(session.id) }
@@ -85,6 +113,11 @@ import Observation
             default: session.state = "saved"
             }
             session.error = result.error
+            integrationError = result.error
+            if session.transcriptOnly == true, result.stage == "ready", result.mediaRemoved == true {
+                try store.removeMediaAfterTranscript(session, job: result)
+                session.savedFile = nil
+            }
             if result.stage == "ready" { session.transcript = URL(fileURLWithPath: result.transcript) }
             try store.save(session)
         } catch {

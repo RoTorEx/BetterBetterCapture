@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Add compact Google Drive and Transcript only integration choices with profile
+  defaults, per-call folder routing and choices frozen at Stop (Voxray 0.6+).
+- Retry failed uploads without losing recordings. Explicit transcript-only calls
+  remove recorder media and recovery audio only after verified transcription
+  and any requested upload; default calls retain all media.
+
 - Show finished recordings directly in the output folder and keep capture
   originals, recovery audio, and metadata under `_CaptureData/<UUID>`.
 

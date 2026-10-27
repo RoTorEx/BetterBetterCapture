@@ -3,6 +3,15 @@ import Foundation
 nonisolated struct VoxrayProfile: Decodable, Identifiable, Sendable {
     let id: String
     let callsDir: String
+    var googleDrive: Bool?
+    var driveFolder: String?
+    var driveSupported: Bool?
 
-    enum CodingKeys: String, CodingKey { case id; case callsDir = "calls_dir" }
+    enum CodingKeys: String, CodingKey {
+        case id
+        case callsDir = "calls_dir"
+        case googleDrive = "google_drive"
+        case driveFolder = "drive_folder"
+        case driveSupported = "drive_supported"
+    }
 }

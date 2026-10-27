@@ -36,6 +36,20 @@ struct VoxrayIntegrationView: View {
                     HStack(spacing: 16) { processingOptions }
                     VStack(alignment: .leading, spacing: 8) { processingOptions }
                 }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 16) { storageOptions }
+                    VStack(alignment: .leading, spacing: 8) { storageOptions }
+                }
+                if calls.googleDrive && !calls.profile.isEmpty {
+                    TextField("Google Drive folder ID", text: $calls.driveFolder)
+                        .textFieldStyle(.roundedBorder).disabled(processingDisabled)
+                    Text("Defaults come from Voxray. Override the folder for this call.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if calls.transcriptOnly {
+                    Text("Deletes call media, recorder originals and recovery audio after a verified transcript and any requested upload. Recognition accuracy still needs review.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if calls.profile.isEmpty {
                     Text("Saved locally. No Voxray processing.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -44,9 +58,9 @@ struct VoxrayIntegrationView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if calls.integrationError != nil {
-                    Text("Voxray unavailable. Recording still works.")
+                    Text(calls.integrationError ?? "Voxray unavailable. Recording still works.")
                         .font(.caption).foregroundStyle(.secondary)
-                    Button("Reconnect Voxray") { Task { await calls.refresh() } }
+                    Button("Retry Voxray") { Task { await calls.refresh() } }
                 }
             }
         } label: {
@@ -55,6 +69,16 @@ struct VoxrayIntegrationView: View {
         }
         .padding(16)
         .task { await calls.refresh() }
+    }
+
+    @ViewBuilder private var storageOptions: some View {
+        Toggle("Google Drive", isOn: $calls.googleDrive)
+            .toggleStyle(.checkbox).disabled(processingDisabled || !calls.driveSupported)
+            .help("Requires Voxray 0.6 or later and personal Google OAuth credentials.")
+            .fixedSize(horizontal: true, vertical: false)
+        Toggle("Transcript only", isOn: $calls.transcriptOnly)
+            .toggleStyle(.checkbox).disabled(processingDisabled || !calls.driveSupported)
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder private var processingOptions: some View {
