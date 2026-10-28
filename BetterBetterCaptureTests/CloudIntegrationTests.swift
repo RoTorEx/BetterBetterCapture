@@ -32,6 +32,30 @@ import Testing
         #expect(next.transcriptOnly == false)
     }
 
+    @Test func profileDefaultsAndMediaOnlyArchiveFreezeIndependently() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = CaptureSessionStore(registry: root.appending(path: "registry"))
+        let workflow = CallWorkflow(store: store, client: CloudVoxray())
+        await workflow.refresh()
+        workflow.profile = "project"
+        #expect(workflow.keepVideo)
+        #expect(workflow.googleDrive)
+        #expect(!workflow.transcriptOnly)
+        workflow.transcribe = false
+        workflow.keepVideo = false
+        let capture = try store.begin(directory: root, name: "Archive", profile: "")
+        let stopped = workflow.finishCapture(capture)
+        #expect(stopped.transcribe == false)
+        #expect(stopped.googleDrive == true)
+        #expect(stopped.transcriptOnly == false)
+        #expect(stopped.keepVideo == false)
+        workflow.profile = "project"
+        #expect(workflow.keepVideo)
+        #expect(workflow.transcribe)
+        #expect(!workflow.transcriptOnly)
+    }
+
     @Test func retentionControlsKeepConsistentChoices() {
         let workflow = CallWorkflow(client: CloudVoxray())
         workflow.transcriptOnly = true
@@ -110,7 +134,7 @@ import Testing
     var result: VoxrayJob?
 
     func profiles() async throws -> [VoxrayProfile] {
-        [VoxrayProfile(id: "project", callsDir: "/calls", googleDrive: true,
+        [VoxrayProfile(id: "project", callsDir: "/calls", keepVideo: true, googleDrive: true,
                        driveFolder: "defaultFolder", driveSupported: true)]
     }
     func version() async throws -> String { "0.6.0" }

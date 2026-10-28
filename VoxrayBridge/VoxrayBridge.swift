@@ -17,7 +17,7 @@ final class VoxrayBridge: NSObject, VoxrayBridgeProtocol {
 
     private func execute(_ operation: String, payload: String) throws -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        let executable = home.appending(path: ".x-cli-voxray/bin/voxray")
+        let executable = home.appending(path: ".toolbelt/voxray/bin/voxray")
         var (arguments, requestFile) = try prepare(operation, payload: payload)
         defer { if let requestFile { try? FileManager.default.removeItem(at: requestFile) } }
         arguments += ["--json", "--non-interactive"]

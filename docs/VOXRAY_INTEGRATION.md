@@ -4,7 +4,7 @@ The recorder captures in its own process. The sandboxed application owns its
 writer, source containers, lossless system/microphone CAF fragments, serial
 final-audio processing, and session history. The nonsandboxed, Apple
 Development-signed embedded XPC service owns only a fixed adapter to
-`~/.x-cli-voxray/bin/voxray`. It launches programs directly with arguments,
+`~/.toolbelt/voxray/bin/voxray`. It launches programs directly with arguments,
 never through a shell. Its allowlist is version, profiles, submit, status and run.
 The version adapter reads the CLI's existing JSON version command and normalizes
 it into the bridge envelope. The UI labels the Voxray block with that installed
@@ -127,7 +127,11 @@ No release or normal local installation was performed in this stage.
 ## Google Drive and transcript-only (Voxray 0.6+)
 
 Discovery advertises drive_supported, google_drive and drive_folder. The selected
-profile supplies Drive defaults. The per-call Google Drive checkbox and folder
+profile supplies Drive defaults and keep_video. Legacy discovery without
+keep_video defaults to false. Selecting a profile restores those defaults; manual
+changes are frozen for the current capture. Transcript defaults on. With Transcript
+off, Google Drive still archives the recording after import. Feedback remains in
+the CLI. The per-call Google Drive checkbox and folder
 ID override are frozen at Stop, persisted in the capture session and passed as
 google_drive/drive_folder. Transcript only maps to transcript_only; it is never a
 persistent default. Unsupported CLI versions receive no extension fields.

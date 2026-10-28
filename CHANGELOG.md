@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Apply Voxray profile video-retention defaults, explain media-only Drive archiving, and keep transcript-only deletion off for each new recording.
+
 ## [2026.5.0] - 2026-10-27
 
 - Add compact Google Drive and Transcript only integration choices with profile

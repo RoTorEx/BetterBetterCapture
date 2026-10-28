@@ -48,7 +48,7 @@
 - Each integration has its own labeled block. Voxray displays the installed CLI
   version in parentheses; unavailable version discovery does not block capture.
 - Voxray call name, profile, Transcript and Keep video remain editable during
-  capture and freeze together when Stop is accepted. Keep video defaults off:
+  capture and freeze together when Stop is accepted. Keep video follows the selected Voxray profile (false when omitted):
   video captures file canonical audio, with an additional video copy in the call
   folder only when checked. Recorder originals are retained unless Transcript only explicitly requests cleanup.
   Keep video and its explanation appear only in Screen + Audio mode, including

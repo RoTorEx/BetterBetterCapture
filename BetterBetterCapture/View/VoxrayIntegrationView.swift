@@ -74,10 +74,11 @@ struct VoxrayIntegrationView: View {
     @ViewBuilder private var storageOptions: some View {
         Toggle("Google Drive", isOn: $calls.googleDrive)
             .toggleStyle(.checkbox).disabled(processingDisabled || !calls.driveSupported)
-            .help("Requires Voxray 0.6 or later and personal Google OAuth credentials.")
+            .help("Uploads after the selected processing finishes. With Transcript off, uploads the recording only.")
             .fixedSize(horizontal: true, vertical: false)
         Toggle("Transcript only", isOn: $calls.transcriptOnly)
             .toggleStyle(.checkbox).disabled(processingDisabled || !calls.driveSupported)
+            .help("Keep text and delete recording media after successful processing and any requested upload. Off for each new recording.")
             .fixedSize(horizontal: true, vertical: false)
     }
 

@@ -7,7 +7,7 @@ import Observation
     var profile = "" {
         didSet {
             guard oldValue != profile else { return }
-            applyDriveDefaults()
+            applyProfileDefaults()
         }
     }
     var transcribe = true {
@@ -25,8 +25,9 @@ import Observation
     }
     var driveSupported: Bool { profiles.first { $0.id == profile }?.driveSupported == true }
 
-    private func applyDriveDefaults() {
+    private func applyProfileDefaults() {
         let selected = profiles.first { $0.id == profile }
+        keepVideo = selected?.keepVideo ?? false
         googleDrive = selected?.googleDrive ?? false
         driveFolder = selected?.driveFolder ?? ""
     }
@@ -47,7 +48,7 @@ import Observation
         do {
             let firstDiscovery = profiles.isEmpty
             profiles = try await client.profiles()
-            if firstDiscovery { applyDriveDefaults() }
+            if firstDiscovery { applyProfileDefaults() }
             integrationError = nil
         } catch { integrationError = error.localizedDescription }
         // A helper or app restart does not lose accepted jobs. The OS lock prevents duplicates.
