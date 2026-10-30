@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.5.1] - 2026-10-30
+
 - Use a persistent self-signed local identity for `make install-local`, without
   an Apple account, to keep signing requirements stable across personal builds.
   Register and reopen the installed app; preserve sandbox permissions and avoid
