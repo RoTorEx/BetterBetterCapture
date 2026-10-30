@@ -50,13 +50,15 @@ install:
 
 install-local:
 	@mkdir -p "$(PROJECT_CONSTRUCTION_SIDE)" "$(LOCAL_APPLICATIONS_DIR)"
-	@$(XCODEBUILD) build $(XCODE_COMMON) -configuration Release -quiet
+	@python3 scripts/local-signing.py -- $(XCODEBUILD) build $(XCODE_COMMON) -configuration Release -quiet
 	@codesign --verify --deep --strict "$(DERIVED_DATA_PATH)/Build/Products/Release/$(PROJECT_NAME).app"
 	@pkill -x "$(PROJECT_NAME)" >/dev/null 2>&1 || true
 	@rm -rf "$(LOCAL_APP_PATH)"
 	@ditto "$(DERIVED_DATA_PATH)/Build/Products/Release/$(PROJECT_NAME).app" "$(LOCAL_APP_PATH)"
 	@rm -rf "$(DERIVED_DATA_PATH)/Build/Products/Debug/$(PROJECT_NAME).app"
 	@touch "$(LOCAL_APP_PATH)"
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$(LOCAL_APP_PATH)"
+	@open "$(LOCAL_APP_PATH)"
 	@printf "Installed %s\n" "$(LOCAL_APP_PATH)"
 
 build:

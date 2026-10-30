@@ -54,13 +54,16 @@ When a model uses CloudKit:
   `~/construction_side/better-better-capture/DerivedData.noindex` so debug app
   bundles do not appear in Spotlight. Keep cloned package state under
   `~/construction_side/better-better-capture/`, never in the repository.
-- For normal local use, run `make install-local`. It builds an Apple
-  Development-signed Release configuration into
-  `~/Applications/BetterBetterCapture.app` and removes the disposable Debug app
-  bundle. Never install an unsigned or changing ad-hoc-signed build: macOS TCC
-  binds Screen Recording permission to the app's signing identity, so replacing
-  a previously authorized app with such a build makes the visible permission
-  ineffective. Do not direct users to launch the Debug product.
+- For normal personal use, run `make install-local`. It builds a Release app
+  using a persistent, self-signed local identity; no Apple account or developer
+  certificate is required. See `business/OPERATIONS.md` for credential ownership
+  and permission migration. Do not install changing ad-hoc signatures: macOS
+  TCC binds permissions to their binary hash, so an enabled Settings entry can
+  stop authorizing a new build. Do not direct users to launch the Debug product.
+- Only the local install overrides hardened runtime off: a self-signed identity
+  has no Apple Team ID for library validation. Preserve sandbox entitlements and
+  let Xcode sign embedded frameworks and XPC services with the same identity.
+  Distribution signing and hardened runtime settings remain project-owned.
 - Put task-local temporary artifacts under the same construction-side directory
   and remove them when the task or command finishes.
 - Never commit secrets, signing material, provisioning profiles, or API keys.

@@ -12,11 +12,38 @@
 - `make install` installs the required local lint tool.
 - `make build`, `make test`, `make lint`, and `make check` are the stable local
   interfaces.
-- `make install-local` builds and verifies an Apple Development-signed Release
-  app, replaces the local copy at `~/Applications/BetterBetterCapture.app`, and
-  removes the disposable Debug app bundle. The stable signing identity preserves
-  macOS privacy permissions across local installs while Spotlight exposes the
-  installed application instead of a build product.
+- `make install-local` builds and verifies a Release app with a persistent local
+  self-signed identity, replaces `~/Applications/BetterBetterCapture.app`,
+  registers and opens the installed app, and removes the disposable Debug app.
+  It requires no Apple account or payment. Quit recording before installing.
+- `scripts/local-signing.py` owns local signing setup. Its dedicated keychain,
+  password file and public certificate live under
+  `~/Library/Application Support/BetterBetterCapture/Signing/` with private
+  directory/file permissions. The private key is imported as non-extractable;
+  temporary PEM and PKCS#12 copies are removed after setup. The keychain is added
+  to the user's existing search list without replacing other entries, and its
+  certificate is trusted only for code signing in the user domain.
+- Reuse this signing directory across builds and back it up securely with the
+  machine. Never commit, upload, regenerate or remove it as build cleanup.
+  Missing or invalid credentials stop installation rather than silently changing
+  identity. The self-signed certificate lasts 3650 days (about ten years) to
+  avoid routine identity rotation; expiry or replacement requires a deliberate
+  signing migration and fresh user permissions. Signing is unlocked for each
+  install and locks again on sleep or after one hour.
+- The first transition from an ad-hoc or other signing identity requires one
+  fresh permission grant. If Settings shows an enabled entry but macOS logs a
+  code-requirement mismatch, quit the app and reset only the affected services
+  for `com.betterbettercapture.app` with `tccutil reset ScreenCapture` and, when
+  affected, `tccutil reset AudioCapture` or `tccutil reset Microphone` (append the
+  bundle ID to each command). Reopen, grant permission, and Quit & Reopen when
+  prompted. Never reset unrelated applications or permissions on every install.
+  A plist or LaunchAgent cannot transfer a grant between signing identities.
+- When changing local signing, verify two builds with different code-directory
+  hashes: their designated requirements must match, and the new installed app
+  must retain Screen Recording and Microphone authorization without another
+  reset or grant. A successful `codesign --verify` alone does not prove TCC
+  authorization. Read the app's permission checks and corresponding macOS TCC
+  decisions after replacement.
 - `make vibe-pull` refreshes committed kernel instructions without rewriting
   project-owned rules or commands.
 - `make vibe-propose` is the only child-to-parent rule-feedback path.

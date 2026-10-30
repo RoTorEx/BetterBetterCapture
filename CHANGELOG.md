@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Use a persistent self-signed local identity for `make install-local`, without
+  an Apple account, to keep signing requirements stable across personal builds.
+  Register and reopen the installed app; preserve sandbox permissions and avoid
+  hardened-runtime library validation failures in local builds.
 - Apply Voxray profile video-retention defaults, explain media-only Drive archiving, and keep transcript-only deletion off for each new recording.
 
 ## [2026.5.0] - 2026-10-27

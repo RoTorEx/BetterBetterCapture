@@ -81,6 +81,16 @@ make build
 make check
 ```
 
+For personal use, run `make install-local`. It builds, installs and opens
+`~/Applications/BetterBetterCapture.app` with a persistent local signing
+identity; no Apple account or paid certificate is needed. Stop recording before
+installing. The first install creates a self-signed certificate and a dedicated
+keychain under `~/Library/Application Support/BetterBetterCapture/Signing/`.
+Keep that private directory across updates so macOS can recognize new builds.
+Grant screen/audio/microphone permissions once after switching signing identity;
+later builds reuse it. A plist alone cannot preserve permissions for changing
+ad-hoc signatures. See [local signing and recovery](business/OPERATIONS.md).
+
 Project truth is routed through:
 
 - `BUSINESS.md` — purpose, concepts, invariants, numbers, and module map;
