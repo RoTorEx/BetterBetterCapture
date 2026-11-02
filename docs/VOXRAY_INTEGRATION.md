@@ -9,6 +9,10 @@ never through a shell. Its allowlist is version, profiles, submit, status and ru
 The version adapter reads the CLI's existing JSON version command and normalizes
 it into the bridge envelope. The UI labels the Voxray block with that installed
 version; failure to discover it does not prevent profile loading or capture.
+The bridge supplies a fixed PATH with Homebrew and standard command directories,
+followed by MacWhisper's bundled CLI directories in `/Applications` and
+`~/Applications`. Transcription therefore works without a shell alias or a
+separately installed `mw` symlink when MacWhisper is in either location.
 No XPC operation can stop capture or delete an original.
 
 The Integrations page inside the menu-bar panel offers a name and a Voxray profile, including an

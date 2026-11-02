@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Find MacWhisper's bundled `mw` CLI for Voxray transcription when launched
+  from the menu-bar app, without requiring a separate CLI symlink.
+
 ## [2026.5.1] - 2026-10-30
 
 - Use a persistent self-signed local identity for `make install-local`, without

@@ -25,7 +25,12 @@ final class VoxrayBridge: NSObject, VoxrayBridgeProtocol {
         process.executableURL = executable
         process.arguments = arguments
         var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        // GUI/XPC launches do not inherit shell setup or MacWhisper's bundled CLI path.
+        environment["PATH"] = [
+            "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin",
+            "/Applications/MacWhisper.app/Contents/MacOS",
+            home.appending(path: "Applications/MacWhisper.app/Contents/MacOS").path
+        ].joined(separator: ":")
         process.environment = environment
         let output = Pipe()
         process.standardOutput = output
