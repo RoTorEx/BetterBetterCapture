@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.5.2] - 2026-11-02
+
 - Find MacWhisper's bundled `mw` CLI for Voxray transcription when launched
   from the menu-bar app, without requiring a separate CLI symlink.
 
