@@ -40,10 +40,8 @@ struct VoxrayIntegrationView: View {
                     HStack(spacing: 16) { storageOptions }
                     VStack(alignment: .leading, spacing: 8) { storageOptions }
                 }
-                if calls.googleDrive && !calls.profile.isEmpty {
-                    TextField("Google Drive folder ID", text: $calls.driveFolder)
-                        .textFieldStyle(.roundedBorder).disabled(processingDisabled)
-                    Text("Defaults come from Voxray. Override the folder for this call.")
+                if calls.googleDrive, let path = calls.drivePath {
+                    Text("Google Drive mirrors: \(path)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if calls.transcriptOnly {
@@ -74,7 +72,7 @@ struct VoxrayIntegrationView: View {
     @ViewBuilder private var storageOptions: some View {
         Toggle("Google Drive", isOn: $calls.googleDrive)
             .toggleStyle(.checkbox).disabled(processingDisabled || !calls.driveSupported)
-            .help("Uploads after the selected processing finishes. With Transcript off, uploads the recording only.")
+            .help("Mirrors the configured call folder in Google Drive after processing. With Transcript off, uploads the recording only.")
             .fixedSize(horizontal: true, vertical: false)
         Toggle("Transcript only", isOn: $calls.transcriptOnly)
             .toggleStyle(.checkbox).disabled(processingDisabled || !calls.driveSupported)

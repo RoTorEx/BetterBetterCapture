@@ -5,7 +5,7 @@ nonisolated struct VoxrayProfile: Decodable, Identifiable, Sendable {
     let callsDir: String
     var keepVideo: Bool?
     var googleDrive: Bool?
-    var driveFolder: String?
+    var drivePath: String?
     var driveSupported: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -13,7 +13,7 @@ nonisolated struct VoxrayProfile: Decodable, Identifiable, Sendable {
         case callsDir = "calls_dir"
         case keepVideo = "keep_video"
         case googleDrive = "google_drive"
-        case driveFolder = "drive_folder"
+        case drivePath = "drive_path"
         case driveSupported = "drive_supported"
     }
 }

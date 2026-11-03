@@ -17,7 +17,7 @@ import Observation
         didSet { if keepVideo { transcriptOnly = false } }
     }
     var googleDrive = false
-    var driveFolder = ""
+    var drivePath: String? { profiles.first { $0.id == profile }?.drivePath }
     var transcriptOnly = false {
         didSet {
             if transcriptOnly { transcribe = true; keepVideo = false }
@@ -29,7 +29,6 @@ import Observation
         let selected = profiles.first { $0.id == profile }
         keepVideo = selected?.keepVideo ?? false
         googleDrive = selected?.googleDrive ?? false
-        driveFolder = selected?.driveFolder ?? ""
     }
 
     private(set) var profiles: [VoxrayProfile] = []
@@ -67,7 +66,7 @@ import Observation
         session.transcribe = transcribe
         session.keepVideo = keepVideo
         session.googleDrive = driveSupported ? googleDrive : nil
-        session.driveFolder = driveSupported && !driveFolder.isEmpty ? driveFolder : nil
+        session.driveFolder = nil
         session.transcriptOnly = driveSupported ? transcriptOnly : nil
         session.state = "processing"
         try? store.save(session)
@@ -77,7 +76,6 @@ import Observation
         keepVideo = false
         transcriptOnly = false
         googleDrive = false
-        driveFolder = ""
         return session
     }
 
@@ -91,7 +89,7 @@ import Observation
             session.transcribe = transcribe
             session.keepVideo = keepVideo
             session.googleDrive = driveSupported ? googleDrive : nil
-            session.driveFolder = driveSupported && !driveFolder.isEmpty ? driveFolder : nil
+            session.driveFolder = nil
             session.transcriptOnly = driveSupported ? transcriptOnly : nil
         }
         activeJobs.insert(session.id)

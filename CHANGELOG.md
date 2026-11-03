@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Mirror Voxray's configured local call hierarchy in Google Drive. Show the
+  derived destination instead of an editable folder ID or per-call route.
+
 ## [2026.5.2] - 2026-11-02
 
 - Find MacWhisper's bundled `mw` CLI for Voxray transcription when launched

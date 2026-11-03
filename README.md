@@ -148,8 +148,9 @@ contracts, required Voxray capabilities and verification limits.
 ### Personal Google Drive calls
 
 With Voxray 0.6 or later, Integrations offers Google Drive and Transcript only.
-The selected destination supplies the Drive default and folder ID; override the
-folder ID for one call when needed. Choices freeze at Stop. Transcript only is
+Voxray's global `sync_gogle_drive` flag supplies the Drive default. The existing
+`calls_dir` determines the mirrored Drive hierarchy; Integrations shows that
+derived path without an editable folder ID. Choices freeze at Stop. Transcript only is
 always opt-in and deletes media only after a verified transcript and requested
 upload succeed. Default recordings retain media. Configure personal Google user
 OAuth credentials in Voxray later; no credentials are bundled in the recorder.

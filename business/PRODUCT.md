@@ -140,10 +140,11 @@
 ## Optional personal Google Drive archive
 
 Integrations keeps Google Drive and Transcript only on a compact checkbox row,
-with a vertical fallback. A Drive folder ID field appears only while upload is
-selected. Selecting a Voxray destination loads its configured Drive default and
-folder; a per-call folder override can route the call elsewhere without changing
-the local destination. These settings remain editable during capture, freeze at
+with a vertical fallback. Selecting a Voxray destination loads its global
+`sync_gogle_drive` default and displays the Drive path derived from its existing
+`calls_dir`. Folder names and nesting mirror the local library literally, including
+prefixes such as `26-10 Aveni`. There is no editable ID or separate Drive route.
+These settings remain editable during capture, freeze at
 Stop, and reset for the next call. Switching to another destination loads that
 profile's defaults. Manual changes survive reopening Integrations.
 

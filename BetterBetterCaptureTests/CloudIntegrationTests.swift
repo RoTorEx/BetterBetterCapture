@@ -12,20 +12,19 @@ import Testing
         await workflow.refresh()
         workflow.profile = "project"
         #expect(workflow.googleDrive)
-        #expect(workflow.driveFolder == "defaultFolder")
-        workflow.driveFolder = "overrideFolder"
+        #expect(workflow.drivePath == "Calls/Project")
         workflow.transcriptOnly = true
         #expect(workflow.transcribe)
         #expect(!workflow.keepVideo)
         let capture = try store.begin(directory: root, name: "", profile: "")
         let stopped = workflow.finishCapture(capture)
         #expect(stopped.googleDrive == true)
-        #expect(stopped.driveFolder == "overrideFolder")
+        #expect(stopped.driveFolder == nil)
         #expect(stopped.transcriptOnly == true)
         #expect(workflow.profile.isEmpty)
         #expect(!workflow.transcriptOnly)
         workflow.profile = "project"
-        #expect(workflow.driveFolder == "defaultFolder")
+        #expect(workflow.drivePath == "Calls/Project")
         workflow.googleDrive = false
         let next = workflow.finishCapture(capture)
         #expect(next.googleDrive == false)
@@ -135,7 +134,7 @@ import Testing
 
     func profiles() async throws -> [VoxrayProfile] {
         [VoxrayProfile(id: "project", callsDir: "/calls", keepVideo: true, googleDrive: true,
-                       driveFolder: "defaultFolder", driveSupported: true)]
+                       drivePath: "Calls/Project", driveSupported: true)]
     }
     func version() async throws -> String { "0.6.0" }
     func status(_ id: UUID) async throws -> VoxrayJob {

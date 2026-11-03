@@ -130,14 +130,17 @@ No release or normal local installation was performed in this stage.
 
 ## Google Drive and transcript-only (Voxray 0.6+)
 
-Discovery advertises drive_supported, google_drive and drive_folder. The selected
-profile supplies Drive defaults and keep_video. Legacy discovery without
+Discovery advertises drive_supported, google_drive and the read-only drive_path.
+Voxray's global sync_gogle_drive flag supplies the Drive default; the existing
+profile calls_dir supplies its literal mirrored hierarchy. No folder ID is
+configured or edited in the recorder. The selected profile supplies keep_video. Legacy discovery without
 keep_video defaults to false. Selecting a profile restores those defaults; manual
 changes are frozen for the current capture. Transcript defaults on. With Transcript
 off, Google Drive still archives the recording after import. Feedback remains in
-the CLI. The per-call Google Drive checkbox and folder
-ID override are frozen at Stop, persisted in the capture session and passed as
-google_drive/drive_folder. Transcript only maps to transcript_only; it is never a
+the CLI. The per-call Google Drive checkbox is frozen at Stop, persisted in the
+capture session and passed as google_drive. New captures never submit a
+drive_folder override. Persisted legacy fields remain readable for already
+accepted jobs. Transcript only maps to transcript_only; it is never a
 persistent default. Unsupported CLI versions receive no extension fields.
 
 Voxray uploads the completed call and verifies its files. Only after ready with
