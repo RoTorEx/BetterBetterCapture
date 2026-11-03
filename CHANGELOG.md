@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.5.3] - 2026-11-03
+
 - Mirror Voxray's configured local call hierarchy in Google Drive. Show the
   derived destination instead of an editable folder ID or per-call route.
 
