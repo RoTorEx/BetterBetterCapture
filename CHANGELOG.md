@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Clarify that Transcript only retains text on this Mac and in Google Drive;
+  Voxray owns the synced retention intent and previously uploaded media cleanup.
+
 ## [2026.5.3] - 2026-11-03
 
 - Mirror Voxray's configured local call hierarchy in Google Drive. Show the

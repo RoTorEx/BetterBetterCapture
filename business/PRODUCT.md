@@ -155,6 +155,10 @@ Personal Drive needs user OAuth, not a standalone service account. Credentials
 can be configured later in Voxray; unavailable credentials preserve all media.
 Sharing is configured in Google Drive on the selected folder, never by the app.
 
+Transcript only means text-only retention everywhere: local call media, recorder
+originals/recovery files and previously uploaded Drive media are removed after
+verification. Voxray owns the synced retention intent and cloud cleanup; other
+devices must support the same state contract to avoid restoring stale media.
 Transcript only is always off initially and cannot be enabled by configuration.
 Selecting it enables Transcript and disables Keep video; disabling Transcript or
 enabling Keep video clears Transcript only. A nonempty saved transcript and

@@ -45,7 +45,7 @@ struct VoxrayIntegrationView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if calls.transcriptOnly {
-                    Text("Deletes call media, recorder originals and recovery audio after a verified transcript and any requested upload. Recognition accuracy still needs review.")
+                    Text("Keeps text only here and in Google Drive after verification. Removes audio, video and recovery files. Review recognition accuracy.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if calls.profile.isEmpty {

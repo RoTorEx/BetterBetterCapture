@@ -144,7 +144,10 @@ accepted by Voxray. Persisted legacy fields remain readable for already
 accepted jobs. Transcript only maps to transcript_only; it is never a
 persistent default. Unsupported CLI versions receive no extension fields.
 
-Voxray uploads the completed call and verifies its files. Only after ready with
+Voxray uploads the completed call and verifies its files. Transcript only means
+text-only retention locally and in Drive, including previously uploaded audio.
+Voxray synchronizes a versioned per-call retention intent before cloud cleanup;
+subsequent sync operations cannot restore media while this intent is present. Only after ready with
 media_removed=true does the recorder clean up its own opted-in finalized media,
 original container and recovery audio, leaving session metadata and other calls.
 A failed upload preserves media and remains retryable through Retry Voxray or
