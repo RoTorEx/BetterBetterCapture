@@ -20,7 +20,7 @@ import Foundation
             recordedAt: formatter.string(from: session.startedAt), profile: session.profile,
             name: session.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Call" : session.name,
             transcribe: session.transcribe ?? true, keepVideo: session.keepVideo ?? false,
-            googleDrive: session.googleDrive, driveFolder: session.driveFolder,
+            googleDrive: session.googleDrive,
             transcriptOnly: session.transcriptOnly)
         let payload = String(data: try JSONEncoder().encode(input), encoding: .utf8) ?? ""
         return try await request("submit", payload: payload)

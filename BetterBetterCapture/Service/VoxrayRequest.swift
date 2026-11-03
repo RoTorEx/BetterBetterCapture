@@ -9,7 +9,6 @@ nonisolated struct VoxrayRequest: Encodable {
     let transcribe: Bool
     let keepVideo: Bool
     var googleDrive: Bool?
-    var driveFolder: String?
     var transcriptOnly: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -19,7 +18,6 @@ nonisolated struct VoxrayRequest: Encodable {
         case profile, name, transcribe
         case keepVideo = "keep_video"
         case googleDrive = "google_drive"
-        case driveFolder = "drive_folder"
         case transcriptOnly = "transcript_only"
     }
 }

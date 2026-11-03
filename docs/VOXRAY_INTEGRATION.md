@@ -139,7 +139,8 @@ changes are frozen for the current capture. Transcript defaults on. With Transcr
 off, Google Drive still archives the recording after import. Feedback remains in
 the CLI. The per-call Google Drive checkbox is frozen at Stop, persisted in the
 capture session and passed as google_drive. New captures never submit a
-drive_folder override. Persisted legacy fields remain readable for already
+drive_folder override, including resubmission of an old session that was never
+accepted by Voxray. Persisted legacy fields remain readable for already
 accepted jobs. Transcript only maps to transcript_only; it is never a
 persistent default. Unsupported CLI versions receive no extension fields.
 
