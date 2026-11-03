@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2026.5.4] - 2026-11-03
+
 - Clarify that Transcript only retains text on this Mac and in Google Drive;
   Voxray owns the synced retention intent and previously uploaded media cleanup.
 
