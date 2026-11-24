@@ -70,5 +70,5 @@
 - Use conventional commits with concise imperative subjects.
 - When explicitly working from a GitHub issue, the existing
   `gh issue develop <issue-number> --checkout` workflow may be used.
-- Keep one completed coherent change per commit and push the tracked branch when
-  ready unless the user says not to.
+- Keep one completed coherent change per commit when the user separately requests
+  a commit. Push the tracked branch only on a separate explicit user request.
